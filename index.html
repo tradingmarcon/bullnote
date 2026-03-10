@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BullNote — Trade Smarter. Grow Faster.</title>
+<meta name="description" content="The trading journal built for serious traders. Track, analyze, and improve with AI-powered psychology insights."/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0F172A; --panel:#0d1424; --card:#1E293B;
+  --border:#334155; --border-hi:#3d4f66;
+  --accent:#22C55E; --deep:#16A34A; --green:#10B981;
+  --red:#EF4444; --amber:#F59E0B;
+  --text:#FFFFFF; --sub:#94A3B8; --muted:#475569;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Montserrat',sans-serif; overflow-x:hidden;
+}
+
+
+
+/* ── NOISE OVERLAY ── */
+body::before{
+  content:''; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:200px;
+}
+
+/* ── NAVBAR ── */
+nav{
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 40px; height:96px;
+  background:rgba(15,23,42,.85); backdrop-filter:blur(20px);
+  border-bottom:1px solid #334155;
+  transition:all .3s;
+}
+.nav-logo{
+  font-family:'Montserrat',sans-serif; font-size:22px; font-weight:800;
+  display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--text);
+}
+.nav-logo span{color:var(--accent)}
+.bull-icon{
+  width:30px; height:30px; background:var(--accent); border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; flex-shrink:0;
+}
+.nav-links{display:flex;align-items:center;gap:8px}
+.nav-link{
+  padding:7px 14px; border-radius:8px; font-size:14px; font-weight:500;
+  color:var(--sub); text-decoration:none; transition:all .15s;
+}
+.nav-link:hover{color:var(--text); background:#ffffff08}
+.nav-cta{
+  background:var(--accent); color:#000; font-weight:700; font-size:14px;
+  border:none; border-radius:10px; padding:8px 20px; cursor:pointer;
+  transition:all .2s; text-decoration:none; display:inline-flex;
+  align-items:center; gap:6px;
+}
+.nav-cta:hover{background:var(--deep); transform:translateY(-1px)}
+
+/* lang switcher */
+.lang-switcher{
+  display:flex; align-items:center; gap:2px;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; padding:3px; margin-right:8px;
+}
+.lang-btn{
+  padding:5px 10px; border-radius:7px; font-size:12px; font-weight:700;
+  border:none; background:transparent; color:var(--muted);
+  cursor:pointer; transition:all .15s; font-family:'Montserrat',sans-serif;
+  letter-spacing:.04em;
+}
+.lang-btn.active{background:var(--border); color:var(--text)}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:120px 24px 80px; position:relative; overflow:hidden;
+}
+.hero-glow{
+  position:absolute; width:800px; height:800px; border-radius:50%;
+  background:radial-gradient(circle, #22C55E12 0%, transparent 65%);
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  pointer-events:none; animation:pulse 4s ease-in-out infinite;
+}
+.hero-grid{
+  position:absolute; inset:0; pointer-events:none; opacity:.04;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:60px 60px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+}
+/* floating particles */
+.particle{
+  position:absolute; border-radius:50%; pointer-events:none;
+  animation:float linear infinite;
+}
+@keyframes float{
+  0%{transform:translateY(0) rotate(0deg); opacity:0}
+  10%{opacity:1}
+  90%{opacity:.5}
+  100%{transform:translateY(-100vh) rotate(360deg); opacity:0}
+}
+@keyframes pulse{
+  0%,100%{transform:translate(-50%,-50%) scale(1); opacity:.6}
+  50%{transform:translate(-50%,-50%) scale(1.15); opacity:1}
+}
+
+.hero-badge{
+  display:inline-flex; align-items:center; gap:8px; margin-bottom:28px;
+  background:#22C55E12; border:1px solid #22C55E25; color:var(--accent);
+  border-radius:100px; padding:7px 18px; font-size:13px; font-weight:600;
+  letter-spacing:.05em; text-transform:uppercase;
+  animation:fadeUp .6s ease both;
+}
+.badge-dot{
+  width:6px; height:6px; border-radius:50%; background:var(--accent);
+  animation:blink 1.5s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hero h1{
+  font-family:'Montserrat',sans-serif; font-size:clamp(44px,8vw,88px);
+  font-weight:800; line-height:1.02; letter-spacing:-.03em;
+  margin-bottom:24px; animation:fadeUp .7s .1s ease both;
+}
+.hero h1 .green{color:var(--accent)}
+.hero h1 .dim{color:var(--muted)}
+
+.hero-sub{
+  font-size:clamp(16px,2.5vw,20px); color:var(--sub); max-width:600px;
+  margin:0 auto 40px; line-height:1.7; font-weight:400;
+  animation:fadeUp .7s .2s ease both;
+}
+.hero-actions{
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  flex-wrap:wrap; animation:fadeUp .7s .3s ease both;
+}
+.btn-primary{
+  background:var(--accent); color:#000; font-weight:700; font-size:16px;
+  border:none; border-radius:14px; padding:14px 32px; cursor:pointer;
+  transition:all .2s; text-decoration:none; display:inline-flex;
+  align-items:center; gap:8px; font-family:'Montserrat',sans-serif;
+  box-shadow:0 0 40px #22C55E25;
+}
+.btn-primary:hover{background:var(--deep); transform:translateY(-2px); box-shadow:0 0 60px #22C55E35}
+.btn-secondary{
+  background:transparent; color:var(--sub); font-weight:600; font-size:15px;
+  border:1px solid var(--border); border-radius:14px; padding:14px 28px;
+  cursor:pointer; transition:all .2s; text-decoration:none; display:inline-flex;
+  align-items:center; gap:8px; font-family:'Montserrat',sans-serif;
+}
+.btn-secondary:hover{border-color:var(--border-hi); color:var(--text); transform:translateY(-2px)}
+
+.hero-stats{
+  display:flex; align-items:center; justify-content:center; gap:32px;
+  margin-top:56px; padding-top:40px; border-top:1px solid var(--border);
+  flex-wrap:wrap; animation:fadeUp .7s .4s ease both;
+}
+.stat-item{text-align:center}
+.stat-num{
+  font-family:'Montserrat',sans-serif; font-size:28px; font-weight:800;
+  color:var(--text); display:block;
+}
+.stat-label{font-size:13px; color:var(--muted); margin-top:2px}
+.stat-divider{width:1px; height:36px; background:var(--border)}
+
+/* ── SECTION ── */
+section{position:relative; z-index:1}
+.section-wrap{max-width:1100px; margin:0 auto; padding:0 24px}
+.section-label{
+  font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent); margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+.section-label::before{content:''; width:20px; height:1px; background:var(--accent)}
+.section-title{
+  font-family:'Montserrat',sans-serif; font-size:clamp(28px,4vw,46px);
+  font-weight:800; line-height:1.1; letter-spacing:-.02em; margin-bottom:16px;
+}
+.section-sub{font-size:17px; color:var(--sub); line-height:1.7; max-width:540px}
+
+/* ── FEATURES ── */
+.features-section{padding:100px 0}
+.features-header{text-align:center; margin-bottom:64px}
+.features-header .section-label{justify-content:center}
+.features-header .section-label::before{display:none}
+.features-header .section-sub{margin:0 auto}
+
+.features-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px;
+}
+.feature-card{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:20px; padding:28px 28px 24px;
+  transition:all .25s; position:relative; overflow:hidden;
+}
+.feature-card::before{
+  content:''; position:absolute; inset:0; border-radius:20px; opacity:0;
+  background:radial-gradient(circle at var(--mx,50%) var(--my,50%), #22C55E08 0%, transparent 60%);
+  transition:opacity .3s;
+}
+.feature-card:hover::before{opacity:1}
+.feature-card:hover{border-color:#334155cc; transform:translateY(-3px); box-shadow:0 16px 48px #00000040}
+.feature-card.featured{
+  border-color:#22C55E30; background:linear-gradient(135deg,#1E293B 0%,#162a1e 100%);
+}
+.feature-card.featured::after{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,#22C55E60,transparent);
+}
+.feature-icon{
+  width:48px; height:48px; border-radius:14px; display:flex;
+  align-items:center; justify-content:center; font-size:22px;
+  margin-bottom:18px; flex-shrink:0;
+}
+.feature-card h3{font-family:'Montserrat',sans-serif; font-size:19px; font-weight:700; margin-bottom:8px}
+.feature-card p{font-size:14px; color:var(--sub); line-height:1.7}
+.feature-tag{
+  display:inline-flex; align-items:center; gap:5px; margin-top:14px;
+  background:#22C55E12; border:1px solid #22C55E25; color:var(--accent);
+  border-radius:100px; padding:3px 10px; font-size:11px; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase;
+}
+
+/* ── DASHBOARD PREVIEW ── */
+.preview-section{padding:80px 0 100px}
+.preview-inner{
+  display:grid; grid-template-columns:1fr 1fr; gap:60px;
+  align-items:center;
+}
+.preview-visual{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:20px; overflow:hidden; position:relative;
+}
+.preview-visual::before{
+  content:''; position:absolute; inset:0; z-index:1;
+  background:linear-gradient(180deg, transparent 50%, var(--bg) 100%);
+}
+.preview-bar{
+  background:var(--panel); border-bottom:1px solid var(--border);
+  padding:12px 16px; display:flex; align-items:center; gap:8px;
+}
+.preview-dot{width:10px;height:10px;border-radius:50%}
+.preview-tabs{display:flex;gap:0;border-bottom:1px solid var(--border)}
+.preview-tab{
+  padding:8px 16px; font-size:12px; font-weight:600; color:var(--muted);
+  border-bottom:2px solid transparent;
+}
+.preview-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.preview-metrics{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px;
+}
+.preview-metric{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px;
+}
+.preview-metric-label{font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.preview-metric-val{font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800}
+.preview-chart{
+  padding:12px; height:100px; position:relative; overflow:hidden;
+}
+.preview-trade-row{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 12px; border-bottom:1px solid var(--border); font-size:12px;
+}
+
+.preview-text-content{padding:0 0 0 8px}
+.preview-list{list-style:none;margin-top:24px;display:flex;flex-direction:column;gap:12px}
+.preview-list li{
+  display:flex; align-items:flex-start; gap:12px;
+  font-size:15px; color:var(--sub); line-height:1.5;
+}
+.preview-list li::before{
+  content:''; width:20px; height:20px; border-radius:6px; flex-shrink:0;
+  background:#22C55E15; border:1px solid #22C55E30;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%2322C55E'%3E%3Cpath fill-rule='evenodd' d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-size:14px; background-repeat:no-repeat; background-position:center;
+  margin-top:1px;
+}
+
+/* ── PRICING ── */
+.pricing-section{padding:100px 0; background:linear-gradient(180deg,transparent,#0d1a12 50%,transparent)}
+.pricing-header{text-align:center; margin-bottom:48px}
+.billing-toggle{
+  display:inline-flex; align-items:center; gap:0;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:12px; padding:4px; margin-bottom:48px;
+}
+.billing-btn{
+  padding:8px 20px; border-radius:8px; font-size:14px; font-weight:600;
+  border:none; background:transparent; color:var(--muted);
+  cursor:pointer; transition:all .2s; font-family:'Montserrat',sans-serif;
+}
+.billing-btn.active{background:var(--border); color:var(--text)}
+.save-badge{
+  background:var(--accent); color:#000; font-size:11px; font-weight:800;
+  border-radius:100px; padding:2px 8px; margin-left:6px;
+}
+
+.pricing-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:780px; margin:0 auto;
+}
+.pricing-card{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:24px; padding:36px 32px; position:relative; overflow:hidden;
+  transition:all .25s;
+}
+.pricing-card:hover{transform:translateY(-4px); box-shadow:0 24px 60px #00000050}
+.pricing-card.popular{
+  border-color:#22C55E40;
+  background:linear-gradient(145deg,#1E293B 0%,#162a1e 100%);
+}
+.pricing-card.popular::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, #22C55E, #10B981);
+}
+.popular-badge{
+  position:absolute; top:20px; right:20px;
+  background:linear-gradient(135deg,var(--accent),var(--green));
+  color:#000; font-size:11px; font-weight:800; letter-spacing:.06em;
+  text-transform:uppercase; border-radius:100px; padding:4px 12px;
+}
+.plan-name{
+  font-family:'Montserrat',sans-serif; font-size:13px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  margin-bottom:10px;
+}
+.plan-price{
+  font-family:'Montserrat',sans-serif; line-height:1; margin-bottom:6px;
+  display:flex; align-items:baseline; gap:4px;
+}
+.plan-price .amount{font-size:52px; font-weight:800}
+.plan-price .period{font-size:15px; color:var(--muted); font-weight:500}
+.plan-price .orig{
+  font-size:16px; color:var(--muted); text-decoration:line-through;
+  margin-left:8px; font-weight:500;
+}
+.plan-desc{font-size:14px; color:var(--sub); margin-bottom:24px; line-height:1.6}
+.plan-divider{height:1px; background:var(--border); margin-bottom:20px}
+.plan-features{list-style:none; display:flex; flex-direction:column; gap:10px; margin-bottom:28px}
+.plan-features li{
+  display:flex; align-items:center; gap:10px; font-size:14px; color:var(--sub);
+}
+.feat-check{
+  width:18px; height:18px; border-radius:5px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:11px;
+}
+.feat-check.yes{background:#22C55E15; color:var(--accent); border:1px solid #22C55E25}
+.feat-check.no{background:var(--panel); color:var(--muted); border:1px solid var(--border)}
+.plan-cta{
+  display:block; width:100%; text-align:center; padding:14px;
+  border-radius:12px; font-weight:700; font-size:15px;
+  text-decoration:none; transition:all .2s; cursor:pointer;
+  font-family:'Montserrat',sans-serif;
+}
+.plan-cta.primary{
+  background:var(--accent); color:#000;
+  box-shadow:0 0 30px #22C55E20;
+}
+.plan-cta.primary:hover{background:var(--deep); transform:translateY(-1px)}
+.plan-cta.secondary{
+  background:transparent; color:var(--sub);
+  border:1px solid var(--border);
+}
+.plan-cta.secondary:hover{border-color:var(--border-hi); color:var(--text)}
+.trial-note{
+  text-align:center; font-size:13px; color:var(--muted); margin-top:16px;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+
+/* ── TESTIMONIALS ── */
+.social-section{padding:80px 0}
+.social-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:48px}
+.testimonial{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:18px; padding:24px; transition:all .2s;
+}
+.testimonial:hover{border-color:var(--border-hi); transform:translateY(-2px)}
+.testimonial-text{font-size:15px; color:var(--sub); line-height:1.7; margin-bottom:18px; font-style:italic}
+.testimonial-author{display:flex; align-items:center; gap:10px}
+.avatar{
+  width:36px; height:36px; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; font-size:14px; font-weight:700;
+  flex-shrink:0;
+}
+.author-name{font-size:14px; font-weight:600}
+.author-role{font-size:12px; color:var(--muted)}
+.stars{color:var(--amber); font-size:13px; margin-bottom:12px; letter-spacing:2px}
+
+/* ── FAQ ── */
+.faq-section{padding:80px 0 100px}
+.faq-grid{max-width:720px; margin:48px auto 0; display:flex; flex-direction:column; gap:8px}
+.faq-item{
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; overflow:hidden; transition:border-color .2s;
+}
+.faq-item:hover{border-color:var(--border-hi)}
+.faq-q{
+  width:100%; text-align:left; padding:18px 22px;
+  background:none; border:none; color:var(--text);
+  font-size:15px; font-weight:600; cursor:none;
+  display:flex; justify-content:space-between; align-items:center; gap:16px;
+  font-family:'Montserrat',sans-serif;
+}
+.faq-chevron{color:var(--muted); transition:transform .25s; flex-shrink:0; font-size:18px}
+.faq-item.open .faq-chevron{transform:rotate(180deg)}
+.faq-a{
+  display:none; padding:0 22px 18px;
+  font-size:14px; color:var(--sub); line-height:1.75;
+  border-top:1px solid var(--border);
+}
+.faq-item.open .faq-a{display:block; padding-top:16px}
+
+/* ── CTA FINAL ── */
+.cta-section{
+  padding:100px 24px; text-align:center; position:relative; overflow:hidden;
+}
+.cta-section::before{
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 70% 60% at 50% 50%, #22C55E0a 0%, transparent 70%);
+}
+.cta-section h2{
+  font-family:'Montserrat',sans-serif; font-size:clamp(32px,5vw,58px);
+  font-weight:800; letter-spacing:-.02em; margin-bottom:16px; position:relative;
+}
+.cta-section p{font-size:17px; color:var(--sub); margin-bottom:36px; position:relative}
+
+/* ── FOOTER ── */
+footer{
+  border-top:1px solid var(--border); padding:40px 40px 32px;
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:16px;
+}
+.footer-logo{
+  display:flex; align-items:center;
+}
+.footer-links{display:flex; gap:24px; flex-wrap:wrap}
+.footer-link{font-size:13px; color:var(--muted); text-decoration:none; transition:color .15s}
+.footer-link:hover{color:var(--sub)}
+.footer-copy{font-size:12px; color:var(--muted)}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{
+  from{opacity:0; transform:translateY(24px)}
+  to{opacity:1; transform:translateY(0)}
+}
+.reveal{opacity:0; transform:translateY(30px); transition:all .6s ease}
+.reveal.visible{opacity:1; transform:none}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  nav{padding:0 20px}
+  .nav-links .nav-link{display:none}
+  .preview-inner{grid-template-columns:1fr}
+  .pricing-grid{grid-template-columns:1fr}
+  .hero-stats .stat-divider{display:none}
+  footer{flex-direction:column; text-align:center}
+}
+
+/* equity curve svg */
+.eq-path{stroke-dasharray:1000;stroke-dashoffset:1000;animation:drawLine 2s .5s ease forwards}
+@keyframes drawLine{to{stroke-dashoffset:0}}
+</style>
+</head>
+<body>
+
+<!-- ══ NAVBAR ══ -->
+<nav id="navbar">
+  <a class="nav-logo" href="#">
+    <img src="image2.png" alt="BullNote" style="height:80px;width:auto;object-fit:contain;" />
+  </a>
+  <div class="nav-links">
+    <div class="lang-switcher">
+      <button class="lang-btn active" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" onclick="setLang('pt')">PT</button>
+      <button class="lang-btn" onclick="setLang('es')">ES</button>
+    </div>
+    <a href="#features" class="nav-link" data-t="navFeatures">Features</a>
+    <a href="#pricing" class="nav-link" data-t="navPricing">Pricing</a>
+    <a href="#faq" class="nav-link" data-t="navFaq">FAQ</a>
+    <a href="app.html" class="nav-cta" data-t="navCta">Get Started →</a>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-grid"></div>
+  <div id="particles"></div>
+  <div style="position:relative;z-index:1;width:100%">
+    <div class="hero-badge"><div class="badge-dot"></div><span data-t="heroBadge">Now with AI Psychology Analysis</span></div>
+    <h1 data-t="heroTitle">Trade Smarter.<br/><span class="green">Grow Faster.</span><br/><span class="dim">Stay Disciplined.</span></h1>
+    <p class="hero-sub" data-t="heroSub">The professional trading journal that transforms raw trade data into actionable insights — with AI-powered psychology analysis and discipline scoring.</p>
+    <div class="hero-actions">
+      <a href="app.html" class="btn-primary" data-t="heroCta">Start Free Trial →</a>
+      <a href="#features" class="btn-secondary" data-t="heroLearn">See Features ↓</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat-item">
+        <span class="stat-num">8+</span>
+        <div class="stat-label" data-t="stat1">Powerful Metrics</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">3</span>
+        <div class="stat-label" data-t="stat2">Languages</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">AI</span>
+        <div class="stat-label" data-t="stat3">Psychology Engine</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <span class="stat-num">3</span>
+        <div class="stat-label" data-t="stat4">Days Free Trial</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES ══ -->
+<section class="features-section" id="features">
+  <div class="section-wrap">
+    <div class="features-header reveal">
+      <div class="section-label" data-t="featLabel">Features</div>
+      <h2 class="section-title" data-t="featTitle">Everything a serious trader needs</h2>
+      <p class="section-sub" data-t="featSub">Built from the ground up for traders who treat their trading like a business.</p>
+    </div>
+    <div class="features-grid">
+
+      <div class="feature-card reveal" style="animation-delay:.05s">
+        <div class="feature-icon" style="background:#22C55E15">📓</div>
+        <h3 data-t="f1Title">Trade Journal</h3>
+        <p data-t="f1Desc">Log every trade with full detail — entry, exit, strategy, gamma levels, partials, charts and notes. Never lose track of a trade again.</p>
+      </div>
+
+      <div class="feature-card featured reveal" style="animation-delay:.1s">
+        <div class="feature-icon" style="background:#22C55E20">📊</div>
+        <h3 data-t="f2Title">Performance Dashboard</h3>
+        <p data-t="f2Desc">Real-time metrics: Win Rate, Profit Factor, Max Drawdown, Avg Win/Loss, Equity Curve and daily P&L bar chart with zoom & pan.</p>
+        <div class="feature-tag">⭐ <span data-t="featPremium">Core Feature</span></div>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.15s">
+        <div class="feature-icon" style="background:#10B98115">🎯</div>
+        <h3 data-t="f3Title">Discipline Score</h3>
+        <p data-t="f3Desc">Daily discipline rating (0–100) based on 3 pillars: plan followed, stop respected, and trade rating. Know exactly where you're slipping.</p>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.2s">
+        <div class="feature-icon" style="background:#F59E0B15">⭐</div>
+        <h3 data-t="f4Title">Trade Rating</h3>
+        <p data-t="f4Desc">Rate every trade 1–5 stars based on execution quality. Filter and sort your journal by rating to identify your best setups.</p>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.25s">
+        <div class="feature-icon" style="background:#3b82f615">📅</div>
+        <h3 data-t="f5Title">Trading Calendar</h3>
+        <p data-t="f5Desc">Visual monthly calendar showing your P&L by day. Instantly spot your best and worst trading days at a glance.</p>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.3s">
+        <div class="feature-icon" style="background:#a855f715">🔬</div>
+        <h3 data-t="f6Title">Strategy Analysis</h3>
+        <p data-t="f6Desc">Deep breakdown by strategy: win rate, profit factor, average trade. Know which setups make you money and which ones don't.</p>
+      </div>
+
+      <div class="feature-card featured reveal" style="animation-delay:.35s" id="aiFeatureCard">
+        <div class="feature-icon" style="background:#22C55E20">🧠</div>
+        <h3 data-t="f7Title">AI Psychology Analysis</h3>
+        <p data-t="f7Desc">AI reads your psychology notes and generates personalized insights about your emotional patterns, biases and mental edge. <em style="color:var(--accent)">Premium only.</em></p>
+        <div class="feature-tag">✨ <span data-t="featAI">Premium AI</span></div>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.4s">
+        <div class="feature-icon" style="background:#22C55E15">🌍</div>
+        <h3 data-t="f8Title">Multi-Language</h3>
+        <p data-t="f8Desc">Full support for English, Portuguese (BR) and Spanish. Switch language instantly — your data stays the same, the interface adapts.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ DASHBOARD PREVIEW ══ -->
+<section class="preview-section">
+  <div class="section-wrap">
+    <div class="preview-inner">
+      <div class="preview-visual reveal">
+        <div class="preview-bar">
+          <div class="preview-dot" style="background:#ef4444"></div>
+          <div class="preview-dot" style="background:#f59e0b"></div>
+          <div class="preview-dot" style="background:#22c55e"></div>
+          <div style="flex:1;margin-left:8px;background:#334155;border-radius:4px;height:18px;"></div>
+        </div>
+        <div class="preview-tabs">
+          <div class="preview-tab active">Dashboard</div>
+          <div class="preview-tab">Trades</div>
+          <div class="preview-tab">Analysis</div>
+          <div class="preview-tab">Calendar</div>
+        </div>
+        <div class="preview-metrics">
+          <div class="preview-metric">
+            <div class="preview-metric-label">TOTAL P&L</div>
+            <div class="preview-metric-val" style="color:#22C55E">+$4,820</div>
+          </div>
+          <div class="preview-metric">
+            <div class="preview-metric-label">WIN RATE</div>
+            <div class="preview-metric-val" style="color:#10B981">68.4%</div>
+          </div>
+          <div class="preview-metric">
+            <div class="preview-metric-label">PROFIT FACTOR</div>
+            <div class="preview-metric-val" style="color:#22C55E">2.1x</div>
+          </div>
+          <div class="preview-metric">
+            <div class="preview-metric-label">DISCIPLINE</div>
+            <div class="preview-metric-val" style="color:#F59E0B">82/100</div>
+          </div>
+          <div class="preview-metric">
+            <div class="preview-metric-label">AVG RATING</div>
+            <div class="preview-metric-val" style="color:#F59E0B;font-size:14px">★★★★☆</div>
+          </div>
+          <div class="preview-metric">
+            <div class="preview-metric-label">MAX DD</div>
+            <div class="preview-metric-val" style="color:#EF4444">-$640</div>
+          </div>
+        </div>
+        <div class="preview-chart">
+          <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#22C55E" stop-opacity=".3"/>
+                <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,70 L40,65 L80,55 L110,60 L140,45 L170,35 L200,40 L230,25 L260,20 L290,28 L320,15 L360,10 L400,5" fill="none" stroke="#22C55E" stroke-width="2" class="eq-path"/>
+            <path d="M0,70 L40,65 L80,55 L110,60 L140,45 L170,35 L200,40 L230,25 L260,20 L290,28 L320,15 L360,10 L400,5 L400,80 L0,80 Z" fill="url(#chartGrad)" class="eq-path"/>
+          </svg>
+        </div>
+        <div>
+          <div class="preview-trade-row">
+            <span style="color:#22C55E;font-weight:700;font-size:13px">▲ NQ</span>
+            <span style="font-family:'Montserrat',sans-serif;font-size:12px;color:#22C55E">+$320</span>
+            <span style="font-size:11px;color:#475569">★★★★★</span>
+          </div>
+          <div class="preview-trade-row">
+            <span style="color:#EF4444;font-weight:700;font-size:13px">▼ ES</span>
+            <span style="font-family:'Montserrat',sans-serif;font-size:12px;color:#EF4444">-$120</span>
+            <span style="font-size:11px;color:#475569">★★★☆☆</span>
+          </div>
+          <div class="preview-trade-row" style="border:none">
+            <span style="color:#22C55E;font-weight:700;font-size:13px">▲ NQ</span>
+            <span style="font-family:'Montserrat',sans-serif;font-size:12px;color:#22C55E">+$540</span>
+            <span style="font-size:11px;color:#475569">★★★★☆</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-text-content reveal" style="animation-delay:.2s">
+        <div class="section-label" data-t="prevLabel">Dashboard</div>
+        <h2 class="section-title" data-t="prevTitle">Your entire trading performance, at a glance</h2>
+        <p class="section-sub" data-t="prevDesc">Stop guessing what's working. BullNote gives you the full picture — every metric, every pattern, every edge.</p>
+        <ul class="preview-list">
+          <li data-t="prev1">Interactive equity curve with zoom & pan</li>
+          <li data-t="prev2">Discipline Score with 3-pillar breakdown</li>
+          <li data-t="prev3">P&L calendar — spot your best days instantly</li>
+          <li data-t="prev4">Strategy analysis with win rate per setup</li>
+          <li data-t="prev5">AI psychology insights from your trade notes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PRICING ══ -->
+<section class="pricing-section" id="pricing">
+  <div class="section-wrap">
+    <div class="pricing-header reveal">
+      <div class="section-label" style="justify-content:center;display:flex" data-t="priceLabel">Pricing</div>
+      <h2 class="section-title" data-t="priceTitle">Simple, transparent pricing</h2>
+      <p class="section-sub" style="margin:0 auto" data-t="priceSub">Start free. Upgrade when you're ready to unlock your full potential.</p>
+      <div style="margin-top:24px">
+        <div class="billing-toggle">
+          <button class="billing-btn active" id="btnMonthly" onclick="setBilling('monthly')" data-t="billMonthly">Monthly</button>
+          <button class="billing-btn" id="btnAnnual" onclick="setBilling('annual')" data-t="billAnnual">Annual <span class="save-badge" data-t="saveLabel">Save 20%</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- PRO -->
+      <div class="pricing-card reveal">
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">
+          <span class="amount" id="proPrice">$16.99</span>
+          <span class="period" data-t="perMonth">/month</span>
+          <span class="orig" id="proOrig" style="display:none">$16.99</span>
+        </div>
+        <p class="plan-desc" data-t="proDesc">Everything you need to track and analyze your trading performance.</p>
+        <div class="plan-divider"></div>
+        <ul class="plan-features">
+          <li><div class="feat-check yes">✓</div><span data-t="pf1">Trade Journal — unlimited trades</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf2">Performance Dashboard</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf3">Discipline Score</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf4">Trade Rating (⭐ 1–5)</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf5">Trading Calendar</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf6">Strategy Analysis</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf7">Multi-language (EN/PT/ES)</span></li>
+          <li><div class="feat-check no">✗</div><span style="color:var(--muted)" data-t="pf8">AI Psychology Analysis</span></li>
+        </ul>
+        <a href="app.html" class="plan-cta secondary" data-t="proBtn">Get Started</a>
+      </div>
+
+      <!-- PREMIUM -->
+      <div class="pricing-card popular reveal" style="animation-delay:.1s">
+        <div class="popular-badge" data-t="popularBadge">Most Popular</div>
+        <div class="plan-name">Premium</div>
+        <div class="plan-price">
+          <span class="amount" id="premiumPrice">$24.99</span>
+          <span class="period" data-t="perMonth">/month</span>
+          <span class="orig" id="premiumOrig" style="display:none">$24.99</span>
+        </div>
+        <p class="plan-desc" data-t="premiumDesc">Full power with AI — for traders serious about their psychology and mental edge.</p>
+        <div class="plan-divider"></div>
+        <ul class="plan-features">
+          <li><div class="feat-check yes">✓</div><span data-t="pf1">Trade Journal — unlimited trades</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf2">Performance Dashboard</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf3">Discipline Score</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf4">Trade Rating (⭐ 1–5)</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf5">Trading Calendar</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf6">Strategy Analysis</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="pf7">Multi-language (EN/PT/ES)</span></li>
+          <li><div class="feat-check yes" style="background:#22C55E25;border-color:#22C55E50;color:var(--accent)">✓</div><span style="color:var(--accent);font-weight:600" data-t="pf8ai">🧠 AI Psychology Analysis</span></li>
+        </ul>
+        <a href="app.html" class="plan-cta primary" data-t="premiumBtn">Start 3-Day Free Trial →</a>
+        <div class="trial-note">🔒 <span data-t="trialNote">No credit card required for trial</span></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ TESTIMONIALS ══ -->
+<section class="social-section">
+  <div class="section-wrap">
+    <div class="reveal" style="text-align:center">
+      <div class="section-label" style="justify-content:center;display:flex" data-t="socialLabel">Traders Love It</div>
+      <h2 class="section-title" data-t="socialTitle">Real traders, real results</h2>
+    </div>
+    <div class="social-grid">
+      <div class="testimonial reveal">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text" data-t="t1">"BullNote completely changed how I review my trades. The Discipline Score keeps me accountable every single day."</p>
+        <div class="testimonial-author">
+          <div class="avatar" style="background:#22C55E20;color:var(--accent)">M</div>
+          <div><div class="author-name">Marcus R.</div><div class="author-role" data-t="t1role">Futures Trader · NQ/ES</div></div>
+        </div>
+      </div>
+      <div class="testimonial reveal" style="animation-delay:.1s">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text" data-t="t2">"The AI psychology analysis is insane. It identified that I was revenge trading on Thursdays — I had no idea until I saw the pattern."</p>
+        <div class="testimonial-author">
+          <div class="avatar" style="background:#10B98120;color:var(--green)">A</div>
+          <div><div class="author-name">Ana L.</div><div class="author-role" data-t="t2role">Forex Trader · Premium</div></div>
+        </div>
+      </div>
+      <div class="testimonial reveal" style="animation-delay:.2s">
+        <div class="stars">★★★★★</div>
+        <p class="testimonial-text" data-t="t3">"Finally a journal that doesn't feel like a spreadsheet. Clean, fast and shows me exactly what strategies are actually profitable."</p>
+        <div class="testimonial-author">
+          <div class="avatar" style="background:#F59E0B20;color:var(--amber)">D</div>
+          <div><div class="author-name">Diego S.</div><div class="author-role" data-t="t3role">Day Trader · Pro Plan</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section class="faq-section" id="faq">
+  <div class="section-wrap">
+    <div class="reveal" style="text-align:center">
+      <div class="section-label" style="justify-content:center;display:flex">FAQ</div>
+      <h2 class="section-title" data-t="faqTitle">Frequently Asked Questions</h2>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item reveal">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq1q">Do I need a credit card for the free trial?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq1a">No. The 3-day free trial for the Premium plan requires no credit card. Just sign up and explore all features — you'll only be asked to pay if you decide to continue.</div>
+      </div>
+      <div class="faq-item reveal" style="animation-delay:.05s">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq2q">Can I switch between Pro and Premium?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq2a">Yes, you can upgrade or downgrade your plan at any time. Your trade data is always preserved regardless of which plan you're on.</div>
+      </div>
+      <div class="faq-item reveal" style="animation-delay:.1s">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq3q">Is my trading data secure?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq3a">Absolutely. Your data is stored in Firebase (Google) with strict security rules — only you can access your own trades. We never share or sell your data.</div>
+      </div>
+      <div class="faq-item reveal" style="animation-delay:.15s">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq4q">What markets does BullNote support?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq4a">BullNote works with any market — Futures (NQ, ES, MNQ), Forex, Stocks, Options, Crypto. You define your own symbols and strategies.</div>
+      </div>
+      <div class="faq-item reveal" style="animation-delay:.2s">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq5q">How does the AI Psychology Analysis work?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq5a">You write psychology notes on each trade (how you were feeling, your mindset, confidence level). The AI reads all your notes together and identifies patterns — like specific emotional states that lead to losses, or behaviors that appear before your best trades.</div>
+      </div>
+      <div class="faq-item reveal" style="animation-delay:.25s">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          <span data-t="faq6q">Can I cancel anytime?</span>
+          <span class="faq-chevron">▼</span>
+        </button>
+        <div class="faq-a" data-t="faq6a">Yes. Cancel anytime with one click. No lock-in, no cancellation fees. Your access continues until the end of the billing period.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FINAL CTA ══ -->
+<section class="cta-section">
+  <div style="position:relative;z-index:1">
+    <h2 data-t="ctaTitle">Ready to trade with<br/><span style="color:var(--accent)">more discipline?</span></h2>
+    <p data-t="ctaSub">Join traders who stopped guessing and started growing.</p>
+    <a href="app.html" class="btn-primary" style="font-size:17px;padding:16px 40px" data-t="ctaBtn">Start Free Trial — No Credit Card →</a>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="footer-logo"><img src="image_dark" alt="BullNote" style="height:28px;width:auto;object-fit:contain;" /></div>
+  <div class="footer-links">
+    <a href="#features" class="footer-link" data-t="navFeatures">Features</a>
+    <a href="#pricing" class="footer-link" data-t="navPricing">Pricing</a>
+    <a href="#faq" class="footer-link">FAQ</a>
+    <a href="app.html" class="footer-link" data-t="footerLogin">Login</a>
+  </div>
+  <div class="footer-copy">© 2025 BullNote. All rights reserved.</div>
+</footer>
+
+<script>
+// ── PARTICLES ──
+const pc = document.getElementById('particles');
+for(let i=0;i<18;i++){
+  const p=document.createElement('div');
+  const s=Math.random()*3+1;
+  p.className='particle';
+  p.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;bottom:-10px;background:${Math.random()>.5?'#22C55E':'#10B981'};opacity:${Math.random()*.4+.1};animation-duration:${Math.random()*12+8}s;animation-delay:${Math.random()*8}s`;
+  pc.appendChild(p);
+}
+
+// ── SCROLL REVEAL ──
+const obs = new IntersectionObserver(entries=>{ entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); }); },{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+
+// ── NAVBAR SCROLL ──
+window.addEventListener('scroll',()=>{ document.getElementById('navbar').style.background=window.scrollY>20?'rgba(15,23,42,.97)':'rgba(15,23,42,.85)'; });
+
+// ── FAQ ──
+function toggleFaq(btn){ const item=btn.parentElement; item.classList.toggle('open'); }
+
+// ── FEATURE CARD MOUSE GLOW ──
+document.querySelectorAll('.feature-card').forEach(card=>{ card.addEventListener('mousemove',e=>{ const r=card.getBoundingClientRect(); card.style.setProperty('--mx',((e.clientX-r.left)/r.width*100)+'%'); card.style.setProperty('--my',((e.clientY-r.top)/r.height*100)+'%'); }); });
+
+// ── BILLING TOGGLE ──
+const prices = {
+  monthly: { pro:'$16.99', premium:'$24.99', proOrig:null, premiumOrig:null },
+  annual:  { pro:'$13.59', premium:'$19.99', proOrig:'$16.99', premiumOrig:'$24.99' }
+};
+function setBilling(mode){
+  document.getElementById('btnMonthly').classList.toggle('active', mode==='monthly');
+  document.getElementById('btnAnnual').classList.toggle('active', mode==='annual');
+  const p = prices[mode];
+  document.getElementById('proPrice').textContent = p.pro;
+  document.getElementById('premiumPrice').textContent = p.premium;
+  const po = document.getElementById('proOrig');
+  const pmo = document.getElementById('premiumOrig');
+  if(p.proOrig){ po.textContent=p.proOrig; po.style.display='inline'; } else { po.style.display='none'; }
+  if(p.premiumOrig){ pmo.textContent=p.premiumOrig; pmo.style.display='inline'; } else { pmo.style.display='none'; }
+}
+
+// ── TRANSLATIONS ──
+const T = {
+  en:{
+    navFeatures:'Features', navPricing:'Pricing', navFaq:'FAQ', navCta:'Get Started →',
+    heroBadge:'Now with AI Psychology Analysis',
+    heroTitle:'Trade Smarter.<br/><span class="green">Grow Faster.</span><br/><span class="dim">Stay Disciplined.</span>',
+    heroSub:'The professional trading journal that transforms raw trade data into actionable insights — with AI-powered psychology analysis and discipline scoring.',
+    heroCta:'Start Free Trial →', heroLearn:'See Features ↓',
+    stat1:'Powerful Metrics', stat2:'Languages', stat3:'Psychology Engine', stat4:'Days Free Trial',
+    featLabel:'Features', featTitle:'Everything a serious trader needs',
+    featSub:'Built from the ground up for traders who treat their trading like a business.',
+    f1Title:'Trade Journal', f1Desc:'Log every trade with full detail — entry, exit, strategy, gamma levels, partials, charts and notes. Never lose track of a trade again.',
+    f2Title:'Performance Dashboard', f2Desc:'Real-time metrics: Win Rate, Profit Factor, Max Drawdown, Avg Win/Loss, Equity Curve and daily P&L bar chart with zoom & pan.',
+    f3Title:'Discipline Score', f3Desc:'Daily discipline rating (0–100) based on 3 pillars: plan followed, stop respected, and trade rating. Know exactly where you\'re slipping.',
+    f4Title:'Trade Rating', f4Desc:'Rate every trade 1–5 stars based on execution quality. Filter and sort your journal by rating to identify your best setups.',
+    f5Title:'Trading Calendar', f5Desc:'Visual monthly calendar showing your P&L by day. Instantly spot your best and worst trading days at a glance.',
+    f6Title:'Strategy Analysis', f6Desc:'Deep breakdown by strategy: win rate, profit factor, average trade. Know which setups make you money and which ones don\'t.',
+    f7Title:'AI Psychology Analysis', f7Desc:'AI reads your psychology notes and generates personalized insights about your emotional patterns, biases and mental edge. <em style="color:var(--accent)">Premium only.</em>',
+    f8Title:'Multi-Language', f8Desc:'Full support for English, Portuguese (BR) and Spanish. Switch language instantly — your data stays the same.',
+    featPremium:'Core Feature', featAI:'Premium AI',
+    prevLabel:'Dashboard', prevTitle:'Your entire trading performance, at a glance',
+    prevDesc:'Stop guessing what\'s working. BullNote gives you the full picture — every metric, every pattern, every edge.',
+    prev1:'Interactive equity curve with zoom & pan', prev2:'Discipline Score with 3-pillar breakdown',
+    prev3:'P&L calendar — spot your best days instantly', prev4:'Strategy analysis with win rate per setup',
+    prev5:'AI psychology insights from your trade notes',
+    priceLabel:'Pricing', priceTitle:'Simple, transparent pricing',
+    priceSub:'Start free. Upgrade when you\'re ready to unlock your full potential.',
+    billMonthly:'Monthly', billAnnual:'Annual ', saveLabel:'Save 20%', perMonth:'/month',
+    proDesc:'Everything you need to track and analyze your trading performance.',
+    premiumDesc:'Full power with AI — for traders serious about their psychology and mental edge.',
+    pf1:'Trade Journal — unlimited trades', pf2:'Performance Dashboard', pf3:'Discipline Score',
+    pf4:'Trade Rating (⭐ 1–5)', pf5:'Trading Calendar', pf6:'Strategy Analysis',
+    pf7:'Multi-language (EN/PT/ES)', pf8:'AI Psychology Analysis', pf8ai:'🧠 AI Psychology Analysis',
+    proBtn:'Get Started', premiumBtn:'Start 3-Day Free Trial →',
+    popularBadge:'Most Popular', trialNote:'No credit card required for trial',
+    socialLabel:'Traders Love It', socialTitle:'Real traders, real results',
+    t1:'"BullNote completely changed how I review my trades. The Discipline Score keeps me accountable every single day."',
+    t1role:'Futures Trader · NQ/ES',
+    t2:'"The AI psychology analysis is insane. It identified that I was revenge trading on Thursdays — I had no idea until I saw the pattern."',
+    t2role:'Forex Trader · Premium',
+    t3:'"Finally a journal that doesn\'t feel like a spreadsheet. Clean, fast and shows me exactly what strategies are actually profitable."',
+    t3role:'Day Trader · Pro Plan',
+    faqTitle:'Frequently Asked Questions',
+    faq1q:'Do I need a credit card for the free trial?',
+    faq1a:'No. The 3-day free trial for the Premium plan requires no credit card. Just sign up and explore all features — you\'ll only be asked to pay if you decide to continue.',
+    faq2q:'Can I switch between Pro and Premium?',
+    faq2a:'Yes, you can upgrade or downgrade your plan at any time. Your trade data is always preserved regardless of which plan you\'re on.',
+    faq3q:'Is my trading data secure?',
+    faq3a:'Absolutely. Your data is stored in Firebase (Google) with strict security rules — only you can access your own trades. We never share or sell your data.',
+    faq4q:'What markets does BullNote support?',
+    faq4a:'BullNote works with any market — Futures (NQ, ES, MNQ), Forex, Stocks, Options, Crypto. You define your own symbols and strategies.',
+    faq5q:'How does the AI Psychology Analysis work?',
+    faq5a:'You write psychology notes on each trade (how you were feeling, your mindset, confidence level). The AI reads all your notes and identifies patterns — like emotional states that lead to losses, or behaviors before your best trades.',
+    faq6q:'Can I cancel anytime?',
+    faq6a:'Yes. Cancel anytime with one click. No lock-in, no cancellation fees. Your access continues until the end of the billing period.',
+    ctaTitle:'Ready to trade with<br/><span style="color:var(--accent)">more discipline?</span>',
+    ctaSub:'Join traders who stopped guessing and started growing.',
+    ctaBtn:'Start Free Trial — No Credit Card →', footerLogin:'Login',
+  },
+  pt:{
+    navFeatures:'Funcionalidades', navPricing:'Preços', navFaq:'FAQ', navCta:'Começar →',
+    heroBadge:'Agora com Análise Psicológica por IA',
+    heroTitle:'Trade com Inteligência.<br/><span class="green">Cresça Mais Rápido.</span><br/><span class="dim">Mantenha a Disciplina.</span>',
+    heroSub:'O diário de trades profissional que transforma dados brutos em insights acionáveis — com análise psicológica por IA e score de disciplina.',
+    heroCta:'Começar Trial Grátis →', heroLearn:'Ver Funcionalidades ↓',
+    stat1:'Métricas Poderosas', stat2:'Idiomas', stat3:'Motor de Psicologia', stat4:'Dias de Trial Grátis',
+    featLabel:'Funcionalidades', featTitle:'Tudo que um trader sério precisa',
+    featSub:'Construído do zero para traders que tratam seu trading como um negócio.',
+    f1Title:'Diário de Trades', f1Desc:'Registre cada trade com detalhes completos — entrada, saída, estratégia, níveis gamma, parciais, gráficos e notas. Nunca perca o controle de um trade.',
+    f2Title:'Dashboard de Performance', f2Desc:'Métricas em tempo real: Taxa de Acerto, Fator de Lucro, Drawdown Máx., Média Vitória/Derrota, Curva de Capital e P&L diário com zoom & pan.',
+    f3Title:'Score de Disciplina', f3Desc:'Pontuação diária (0–100) baseada em 3 pilares: plano seguido, stop respeitado e avaliação do trade. Saiba exatamente onde está falhando.',
+    f4Title:'Avaliação do Trade', f4Desc:'Avalie cada trade de 1 a 5 estrelas com base na qualidade da execução. Filtre e ordene seu diário por avaliação para identificar seus melhores setups.',
+    f5Title:'Calendário de Trades', f5Desc:'Calendário mensal visual mostrando seu P&L por dia. Identifique imediatamente seus melhores e piores dias de trading.',
+    f6Title:'Análise por Estratégia', f6Desc:'Análise profunda por estratégia: taxa de acerto, fator de lucro, média por trade. Saiba quais setups realmente geram dinheiro.',
+    f7Title:'Análise Psicológica por IA', f7Desc:'A IA lê suas notas psicológicas e gera insights personalizados sobre seus padrões emocionais, vieses e vantagem mental. <em style="color:var(--accent)">Apenas Premium.</em>',
+    f8Title:'Multi-Idioma', f8Desc:'Suporte completo para Inglês, Português (BR) e Espanhol. Troque o idioma na hora — seus dados ficam intactos.',
+    featPremium:'Feature Principal', featAI:'IA Premium',
+    prevLabel:'Dashboard', prevTitle:'Toda sua performance, em um só lugar',
+    prevDesc:'Pare de adivinhar o que está funcionando. BullNote te dá o quadro completo — cada métrica, cada padrão, cada vantagem.',
+    prev1:'Curva de capital interativa com zoom & pan', prev2:'Score de Disciplina com análise de 3 pilares',
+    prev3:'Calendário P&L — veja seus melhores dias rapidamente', prev4:'Análise por estratégia com taxa de acerto',
+    prev5:'Insights de psicologia por IA das suas notas de trades',
+    priceLabel:'Preços', priceTitle:'Preços simples e transparentes',
+    priceSub:'Comece grátis. Faça upgrade quando estiver pronto.',
+    billMonthly:'Mensal', billAnnual:'Anual ', saveLabel:'20% off', perMonth:'/mês',
+    proDesc:'Tudo que você precisa para rastrear e analisar sua performance.',
+    premiumDesc:'Poder total com IA — para traders sérios com sua psicologia e vantagem mental.',
+    pf1:'Diário de Trades — ilimitado', pf2:'Dashboard de Performance', pf3:'Score de Disciplina',
+    pf4:'Avaliação do Trade (⭐ 1–5)', pf5:'Calendário de Trades', pf6:'Análise por Estratégia',
+    pf7:'Multi-idioma (EN/PT/ES)', pf8:'Análise Psicológica por IA', pf8ai:'🧠 Análise Psicológica por IA',
+    proBtn:'Começar', premiumBtn:'Iniciar Trial de 3 Dias →',
+    popularBadge:'Mais Popular', trialNote:'Trial sem cartão de crédito',
+    socialLabel:'Traders Adoram', socialTitle:'Traders reais, resultados reais',
+    t1:'"O BullNote mudou completamente como eu reviso meus trades. O Score de Disciplina me mantém responsável todo dia."',
+    t1role:'Trader de Futuros · NQ/ES',
+    t2:'"A análise psicológica por IA é incrível. Identificou que eu estava fazendo revenge trading às quintas — não tinha ideia até ver o padrão."',
+    t2role:'Trader Forex · Premium',
+    t3:'"Finalmente um diário que não parece uma planilha. Limpo, rápido e me mostra exatamente quais estratégias são lucrativas."',
+    t3role:'Day Trader · Plano Pro',
+    faqTitle:'Perguntas Frequentes',
+    faq1q:'Preciso de cartão de crédito para o trial?',
+    faq1a:'Não. O trial de 3 dias do plano Premium não requer cartão de crédito. Basta se cadastrar e explorar todos os recursos — só pediremos pagamento se você decidir continuar.',
+    faq2q:'Posso trocar entre Pro e Premium?',
+    faq2a:'Sim, você pode fazer upgrade ou downgrade do plano a qualquer momento. Seus dados de trades são sempre preservados.',
+    faq3q:'Meus dados de trading são seguros?',
+    faq3a:'Com certeza. Seus dados são armazenados no Firebase (Google) com regras de segurança rígidas — só você acessa seus próprios trades.',
+    faq4q:'Quais mercados o BullNote suporta?',
+    faq4a:'BullNote funciona com qualquer mercado — Futuros (NQ, ES, MNQ), Forex, Ações, Opções, Cripto. Você define seus próprios símbolos e estratégias.',
+    faq5q:'Como funciona a Análise Psicológica por IA?',
+    faq5a:'Você escreve notas psicológicas em cada trade (como estava se sentindo, sua mentalidade). A IA lê todas suas notas e identifica padrões — como estados emocionais que levam a perdas.',
+    faq6q:'Posso cancelar a qualquer momento?',
+    faq6a:'Sim. Cancele quando quiser com um clique. Sem lock-in, sem taxas de cancelamento. Seu acesso continua até o fim do período de cobrança.',
+    ctaTitle:'Pronto para fazer trades com<br/><span style="color:var(--accent)">mais disciplina?</span>',
+    ctaSub:'Junte-se aos traders que pararam de adivinhar e começaram a crescer.',
+    ctaBtn:'Começar Trial Grátis — Sem Cartão →', footerLogin:'Login',
+  },
+  es:{
+    navFeatures:'Funciones', navPricing:'Precios', navFaq:'FAQ', navCta:'Comenzar →',
+    heroBadge:'Ahora con Análisis Psicológico por IA',
+    heroTitle:'Opera con Inteligencia.<br/><span class="green">Crece Más Rápido.</span><br/><span class="dim">Mantén la Disciplina.</span>',
+    heroSub:'El diario de trading profesional que transforma datos en insights accionables — con análisis psicológico por IA y puntuación de disciplina.',
+    heroCta:'Iniciar Trial Gratis →', heroLearn:'Ver Funciones ↓',
+    stat1:'Métricas Poderosas', stat2:'Idiomas', stat3:'Motor de Psicología', stat4:'Días de Trial Gratis',
+    featLabel:'Funciones', featTitle:'Todo lo que un trader serio necesita',
+    featSub:'Construido desde cero para traders que tratan su trading como un negocio.',
+    f1Title:'Diario de Trades', f1Desc:'Registra cada operación con detalle completo — entrada, salida, estrategia, niveles gamma, parciales, gráficos y notas.',
+    f2Title:'Dashboard de Rendimiento', f2Desc:'Métricas en tiempo real: Tasa de Acierto, Factor de Beneficio, Drawdown Máx., Media Ganancia/Pérdida, Curva de Capital y P&L diario.',
+    f3Title:'Score de Disciplina', f3Desc:'Puntuación diaria (0–100) basada en 3 pilares: plan seguido, stop respetado y evaluación del trade.',
+    f4Title:'Evaluación del Trade', f4Desc:'Evalúa cada operación de 1 a 5 estrellas. Filtra y ordena tu diario por evaluación para identificar tus mejores setups.',
+    f5Title:'Calendario de Trades', f5Desc:'Calendario mensual visual mostrando tu P&L por día. Identifica al instante tus mejores y peores días.',
+    f6Title:'Análisis por Estrategia', f6Desc:'Análisis profundo por estrategia: tasa de acierto, factor de beneficio, media por operación.',
+    f7Title:'Análisis Psicológico por IA', f7Desc:'La IA lee tus notas psicológicas y genera insights personalizados sobre tus patrones emocionales y ventaja mental. <em style="color:var(--accent)">Solo Premium.</em>',
+    f8Title:'Multi-Idioma', f8Desc:'Soporte completo para Inglés, Portugués (BR) y Español. Cambia el idioma al instante.',
+    featPremium:'Función Principal', featAI:'IA Premium',
+    prevLabel:'Dashboard', prevTitle:'Todo tu rendimiento, de un vistazo',
+    prevDesc:'Deja de adivinar qué funciona. BullNote te da el panorama completo — cada métrica, cada patrón, cada ventaja.',
+    prev1:'Curva de capital interactiva con zoom & pan', prev2:'Score de Disciplina con análisis de 3 pilares',
+    prev3:'Calendario P&L — detecta tus mejores días al instante', prev4:'Análisis por estrategia con tasa de acierto',
+    prev5:'Insights de psicología por IA de tus notas',
+    priceLabel:'Precios', priceTitle:'Precios simples y transparentes',
+    priceSub:'Empieza gratis. Actualiza cuando estés listo.',
+    billMonthly:'Mensual', billAnnual:'Anual ', saveLabel:'20% desc.', perMonth:'/mes',
+    proDesc:'Todo lo que necesitas para rastrear y analizar tu rendimiento.',
+    premiumDesc:'Máximo poder con IA — para traders serios con su psicología y ventaja mental.',
+    pf1:'Diario de Trades — ilimitado', pf2:'Dashboard de Rendimiento', pf3:'Score de Disciplina',
+    pf4:'Evaluación del Trade (⭐ 1–5)', pf5:'Calendario de Trades', pf6:'Análisis por Estrategia',
+    pf7:'Multi-idioma (EN/PT/ES)', pf8:'Análisis Psicológico por IA', pf8ai:'🧠 Análisis Psicológico por IA',
+    proBtn:'Comenzar', premiumBtn:'Iniciar Trial de 3 Días →',
+    popularBadge:'Más Popular', trialNote:'Trial sin tarjeta de crédito',
+    socialLabel:'Traders lo Aman', socialTitle:'Traders reales, resultados reales',
+    t1:'"BullNote cambió completamente cómo reviso mis operaciones. El Score de Disciplina me mantiene responsable cada día."',
+    t1role:'Trader de Futuros · NQ/ES',
+    t2:'"El análisis psicológico por IA es increíble. Identificó que hacía revenge trading los jueves — no tenía idea hasta ver el patrón."',
+    t2role:'Trader Forex · Premium',
+    t3:'"Por fin un diario que no parece una hoja de cálculo. Limpio, rápido y me muestra exactamente qué estrategias son rentables."',
+    t3role:'Day Trader · Plan Pro',
+    faqTitle:'Preguntas Frecuentes',
+    faq1q:'¿Necesito tarjeta de crédito para el trial?',
+    faq1a:'No. El trial de 3 días del plan Premium no requiere tarjeta de crédito. Solo regístrate y explora todas las funciones.',
+    faq2q:'¿Puedo cambiar entre Pro y Premium?',
+    faq2a:'Sí, puedes actualizar o degradar tu plan en cualquier momento. Tus datos siempre se conservan.',
+    faq3q:'¿Mis datos de trading están seguros?',
+    faq3a:'Absolutamente. Tus datos se almacenan en Firebase (Google) con reglas de seguridad estrictas — solo tú accedes a tus propias operaciones.',
+    faq4q:'¿Qué mercados soporta BullNote?',
+    faq4a:'BullNote funciona con cualquier mercado — Futuros, Forex, Acciones, Opciones, Crypto. Defines tus propios símbolos y estrategias.',
+    faq5q:'¿Cómo funciona el Análisis Psicológico por IA?',
+    faq5a:'Escribes notas psicológicas en cada operación. La IA lee todas tus notas e identifica patrones — como estados emocionales que llevan a pérdidas.',
+    faq6q:'¿Puedo cancelar en cualquier momento?',
+    faq6a:'Sí. Cancela cuando quieras con un clic. Sin lock-in, sin tarifas de cancelación.',
+    ctaTitle:'¿Listo para operar con<br/><span style="color:var(--accent)">más disciplina?</span>',
+    ctaSub:'Únete a los traders que dejaron de adivinar y empezaron a crecer.',
+    ctaBtn:'Iniciar Trial Gratis — Sin Tarjeta →', footerLogin:'Iniciar Sesión',
+  }
+};
+
+let lang = 'en';
+function setLang(l){
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase()===l));
+  document.querySelectorAll('[data-t]').forEach(el=>{
+    const key = el.getAttribute('data-t');
+    if(T[l][key] !== undefined) el.innerHTML = T[l][key];
+  });
+  // update billing label
+  setBilling(document.getElementById('btnMonthly').classList.contains('active')?'monthly':'annual');
+}
+
+// auto-detect browser language
+const bl = navigator.language?.slice(0,2);
+if(bl==='pt') setLang('pt');
+else if(bl==='es') setLang('es');
+</script>
+</body>
+</html>

@@ -1,0 +1,3064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
+<title>BullNote</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+  import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, setDoc, query, where } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword, updateEmail, verifyBeforeUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, updateProfile, sendEmailVerification, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBK5g8DCYgS7AHnELc17xX8CNG3zalFuqo",
+    authDomain: "dmarcontrading.firebaseapp.com",
+    projectId: "dmarcontrading",
+    storageBucket: "dmarcontrading.firebasestorage.app",
+    messagingSenderId: "211444944842",
+    appId: "1:211444944842:web:2d4da843a09876be810933",
+    measurementId: "G-VXRDR81ET4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+
+  window.db = db;
+  window.auth = auth;
+  window.fbCreateUser = createUserWithEmailAndPassword;
+  window.fbSignIn = signInWithEmailAndPassword;
+  window.fbSignOut = signOut;
+  window.fbOnAuthStateChanged = onAuthStateChanged;
+  window.fbUpdatePassword = updatePassword;
+  window.fbUpdateEmail = updateEmail;
+  window.fbVerifyBeforeUpdateEmail = verifyBeforeUpdateEmail;
+  window.fbReauth = reauthenticateWithCredential;
+  window.fbEmailAuthProvider = EmailAuthProvider;
+  window.fbUpdateProfile = updateProfile;
+  window.fbSendEmailVerification = sendEmailVerification;
+  window.fbResetPassword = sendPasswordResetEmail;
+  // Storage
+  const storage = getStorage(app);
+  window.fbStorage = storage;
+  window.fbStorageRef = ref;
+  window.fbUploadBytes = uploadBytes;
+  window.fbGetDownloadURL = getDownloadURL;
+  window.fsCollection = collection;
+  window.fsGetDocs = getDocs;
+  window.fsQuery = query;
+  window.fsWhere = where;
+  window.fsAddDoc = addDoc;
+  window.fsUpdateDoc = updateDoc;
+  window.fsDeleteDoc = deleteDoc;
+  window.fsDoc = doc;
+  window.fsSetDoc = setDoc;
+  window.firebaseReady = true;
+  window.dispatchEvent(new Event("firebaseReady"));
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Barlow Condensed', sans-serif; }
+  input, select, textarea, button { font-family: 'Barlow Condensed', sans-serif; }
+  html, body { background: #0f1117; font-family: 'Barlow Condensed', sans-serif; height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; max-width: 100vw; }
+  #root { min-height: 100vh; display: flex; flex-direction: column; }
+  * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #0f1117; }
+  ::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 4px; }
+  @keyframes tickerMove{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ticker-track{display:flex;gap:0;white-space:nowrap;animation:tickerMove 50s linear infinite;will-change:transform;align-items:center;height:36px;}
+  .ticker-track:hover{animation-play-state:paused;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// Simple SVG chart components (no external deps)
+function SimpleLineChart({data, height=180, T={}}){
+  const h2 = typeof height==='number' ? height : 200;
+  const [tooltip, setTooltip]    = React.useState(null);
+  const [viewRange, setViewRange] = React.useState([0,1]);
+  const dragRef = React.useRef(null);
+  const svgRef  = React.useRef(null);
+
+  // Non-passive wheel listener — must be registered AFTER all hooks
+  React.useEffect(()=>{
+    const el = svgRef.current;
+    if(!el) return;
+    const handler = (e)=>{
+      e.preventDefault();
+      const factor=e.deltaY>0?1.15:0.87;
+      setViewRange(prev=>{
+        const [s,en]=prev;
+        const center=(s+en)/2;
+        const half=Math.min(0.5,((en-s)*factor)/2);
+        const ns=Math.max(0,center-half);
+        const ne=Math.min(1,center+half);
+        return (ne-ns>0.04)?[ns,ne]:prev;
+      });
+      setTooltip(null);
+    };
+    el.addEventListener('wheel', handler, {passive:false});
+    return ()=>el.removeEventListener('wheel', handler);
+  },[]);
+
+  // Early return AFTER all hooks
+  if(!data||data.length<2) return <div style={{height:h2,display:'flex',alignItems:'center',justifyContent:'center',color:'#4a5568',fontSize:16}}>No data yet</div>;
+
+  const [vStart,vEnd] = viewRange;
+  const totalN = data.length;
+  const iStart = Math.max(0, Math.floor(vStart*(totalN-1)));
+  const iEnd   = Math.min(totalN-1, Math.ceil(vEnd*(totalN-1)));
+  const visible = data.slice(iStart, iEnd+1);
+
+  const vals = visible.map(d=>d.pnl);
+  const min=Math.min(...vals), max=Math.max(...vals), range=max-min||1;
+  const W=600, H=h2;
+  const pts = visible.map((d,i)=>({
+    x:(i/(visible.length-1||1))*W,
+    y:H-((d.pnl-min)/range)*(H-24)-12,
+    pnl:d.pnl, tradePnl:d.tradePnl, date:d.date,
+    symbol:d.symbol, strategy:d.strategy, tradeN:d.i
+  }));
+  const polyPts = pts.map(p=>p.x+','+p.y).join(' ');
+  const zeroYRaw = H-((0-min)/range)*(H-24)-12;
+  const zeroY    = Math.max(0, Math.min(H, zeroYRaw));
+  const showZero = zeroYRaw >= 0 && zeroYRaw <= H;
+  const fmtC = v=>(v>=0?'+':'')+v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+  const fmtD = d=>{ if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[2]}/${p[1]}`:d; };
+
+  const onMove = (e)=>{
+    if(dragRef.current) return;
+    const svg=svgRef.current; if(!svg) return;
+    const rect=svg.getBoundingClientRect();
+    const cx=e.touches?e.touches[0].clientX:e.clientX;
+    const idx=Math.max(0,Math.min(pts.length-1,Math.round(((cx-rect.left)/rect.width)*(pts.length-1))));
+    setTooltip({pt:pts[idx],idx,right:idx>pts.length*0.6});
+  };
+
+  const onWheel = (e)=>{
+    e.preventDefault();
+    const factor=e.deltaY>0?1.15:0.87;
+    const [s,en]=viewRange;
+    const center=(s+en)/2;
+    const half=Math.min(0.5,((en-s)*factor)/2);
+    const ns=Math.max(0,center-half);
+    const ne=Math.min(1,center+half);
+    if(ne-ns>0.04) setViewRange([ns,ne]);
+    setTooltip(null);
+  };
+
+  const onMouseDown=(e)=>{
+    if(e.button!==0) return;
+    dragRef.current={startX:e.clientX,startRange:[...viewRange]};
+    e.preventDefault();
+  };
+  const onMouseMoveHandler=(e)=>{
+    if(!dragRef.current){ onMove(e); return; }
+    const dx=e.clientX-dragRef.current.startX;
+    const rect=svgRef.current?.getBoundingClientRect();
+    if(!rect) return;
+    const span=dragRef.current.startRange[1]-dragRef.current.startRange[0];
+    const shift=-(dx/rect.width)*span;
+    const ns=Math.max(0,dragRef.current.startRange[0]+shift);
+    const ne=Math.min(1,ns+span);
+    setViewRange(ne-span<0?[0,span]:[ns,ne]);
+    setTooltip(null);
+  };
+  const onMouseUp=()=>{ dragRef.current=null; };
+
+  const isZoomed=vEnd-vStart<0.99;
+  const tp=tooltip?.pt;
+
+  return (
+    <div style={{position:'relative',userSelect:'none'}}
+      onMouseLeave={()=>{setTooltip(null);dragRef.current=null;}}
+      onMouseUp={onMouseUp}
+    >
+      <div style={{position:'absolute',top:4,right:6,zIndex:20,display:'flex',gap:6,alignItems:'center'}}>
+        {isZoomed&&<button onClick={()=>setViewRange([0,1])} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,color:'#94A3B8',fontSize:11,fontWeight:700,padding:'3px 10px',cursor:'pointer',fontFamily:'inherit'}}>Reset</button>}
+        <span style={{fontSize:10,color:'#334155',fontWeight:600,pointerEvents:'none'}}>
+          {isZoomed?`${iStart+1}–${iEnd+1} / ${totalN}`:"🔍 scroll·drag"}
+        </span>
+      </div>
+
+      <div style={{overflow:'hidden',borderRadius:4}}>
+        <svg ref={svgRef} width="100%" height={h2} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+          style={{overflow:'visible',cursor:dragRef.current?'grabbing':'crosshair',display:'block'}}
+          onMouseMove={onMouseMoveHandler} onMouseDown={onMouseDown}
+          onTouchStart={e=>{e.preventDefault();onMove(e);}} onTouchMove={e=>{e.preventDefault();onMove(e);}}
+        >
+          {showZero&&<line x1={0} y1={zeroY} x2={W} y2={zeroY} stroke="#334155" strokeDasharray="4,4" strokeWidth={1}/>}
+          <polyline points={polyPts} fill="none" stroke="#22C55E" strokeWidth={2.5} strokeLinejoin="round"/>
+          {tp&&<line x1={tp.x} y1={0} x2={tp.x} y2={H} stroke="#22C55E" strokeWidth={1} strokeDasharray="3,3" opacity={0.3}/>}
+        </svg>
+      </div>
+
+      {tp&&<div style={{position:'absolute',pointerEvents:'none',left:`${(tp.x/W)*100}%`,top:`${(tp.y/h2)*100}%`,transform:'translate(-50%,-50%)',width:9,height:9,borderRadius:'50%',background:'#22C55E',border:'2px solid #0F172A',boxShadow:'0 0 0 3px #22C55E40',zIndex:10}}/>}
+
+      {tp&&(
+        <div style={{position:'absolute',pointerEvents:'none',zIndex:30,
+          top:tp.y/h2<0.5?'55%':'2%',
+          left:tooltip.right?'auto':'50%',right:tooltip.right?'0':'auto',
+          transform:tooltip.right?'none':'translateX(-50%)',
+          background:'rgba(8,15,30,0.97)',
+          border:`1px solid ${tp.pnl>=0?'#22c55e50':'#ef444450'}`,
+          borderRadius:12,padding:'12px 16px',minWidth:200,
+          boxShadow:'0 16px 40px rgba(0,0,0,0.6)'
+        }}>
+          <div style={{fontSize:11,color:'#475569',fontWeight:600,marginBottom:10,textTransform:'uppercase',letterSpacing:'0.06em'}}>📅 {fmtD(tp.date)} · Trade #{tp.tradeN}</div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:20,marginBottom:6}}>
+            <span style={{fontSize:12,color:'#475569'}}>{T.thisTrade||'This trade'}</span>
+            <span style={{fontSize:15,fontWeight:800,fontFamily:"'Barlow Condensed',sans-serif",color:(tp.tradePnl||0)>=0?'#22c55e':'#ef4444'}}>{fmtC(tp.tradePnl||0)}</span>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:20,marginBottom:10}}>
+            <span style={{fontSize:12,color:'#475569'}}>{T.cumTotal||'Cumulative'}</span>
+            <span style={{fontSize:20,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",color:tp.pnl>=0?'#22c55e':'#ef4444'}}>{fmtC(tp.pnl)}</span>
+          </div>
+          {(tp.symbol||tp.strategy)&&(
+            <div style={{borderTop:'1px solid #1e2d45',paddingTop:8,display:'flex',gap:6,flexWrap:'wrap'}}>
+              {tp.symbol&&<span style={{fontSize:11,background:'#1E293B',color:'#22C55E',borderRadius:6,padding:'2px 8px',fontWeight:700}}>{tp.symbol}</span>}
+              {tp.strategy&&<span style={{fontSize:11,background:'#1E293B',color:'#94A3B8',borderRadius:6,padding:'2px 8px'}}>{tp.strategy}</span>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(()=>{
+        const step=Math.ceil(visible.length/6);
+        const idxs=[];
+        for(let i=0;i<visible.length;i+=step) idxs.push(i);
+        if(idxs[idxs.length-1]!==visible.length-1) idxs.push(visible.length-1);
+        return(
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:4,paddingLeft:2,paddingRight:2}}>
+            {idxs.map(i=>{
+              const d=visible[i]; if(!d) return null;
+              const p=(d.date||'').split('-');
+              return <span key={i} style={{fontSize:11,color:'#475569',fontWeight:600}}>{p.length===3?`${p[2]}/${p[1]}`:d.date||''}</span>;
+            })}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+
+function SimpleBarChart({data, height=180, colorFn, T={}}){
+  const h2 = typeof height==='number'?height:180;
+  const [tooltip, setTooltip] = React.useState(null);
+
+  if(!data||!data.length) return <div style={{height:h2,display:'flex',alignItems:'center',justifyContent:'center',color:'#4a5568',fontSize:16}}>No data yet</div>;
+
+  const vals = data.map(d=>d.pnl||d.count||0);
+  const absMax = Math.max(...vals.map(Math.abs),1);
+  const fmtC = v=>(v>=0?'+':'')+v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+  const fmtD = d=>{ if(!d) return ''; const p=d.split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d; };
+
+  const td   = tooltip!=null ? data[tooltip.idx] : null;
+  const tval = td ? (td.pnl||td.count||0) : 0;
+  const tc   = td ? (colorFn?colorFn(td,tooltip.idx):(tval>=0?'#22c55e':'#ef4444')) : '#22c55e';
+  const tipW = 190;
+  const tipLeft = tooltip ? Math.min(tooltip.x - tipW/2, (typeof window!=='undefined'?window.innerWidth:800) - tipW - 12) : 0;
+  const tipTop  = tooltip ? Math.max(tooltip.y - 120, 8) : 0;
+
+  return (
+    <div style={{display:'flex',alignItems:'flex-end',gap:2,height:h2,padding:'0 4px',position:'relative'}}
+      onMouseLeave={()=>setTooltip(null)}
+    >
+      {data.map((d,i)=>{
+        const val   = d.pnl||d.count||0;
+        const pct   = Math.abs(val)/absMax*100;
+        const color = colorFn?colorFn(d,i):(val>=0?'#22c55e':'#ef4444');
+        const active= tooltip?.idx===i;
+        return (
+          <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'flex-end',height:'100%',gap:3,cursor:'pointer'}}
+            onMouseEnter={e=>setTooltip({idx:i,x:e.clientX,y:e.clientY})}
+            onMouseMove={e=>tooltip?.idx===i&&setTooltip({idx:i,x:e.clientX,y:e.clientY})}
+            onTouchStart={e=>{e.stopPropagation();const r=e.touches[0];setTooltip(p=>p?.idx===i?null:{idx:i,x:r.clientX,y:r.clientY});}}
+          >
+            <div style={{width:'100%',height:pct+'%',background:color,opacity:active?1:0.7,borderRadius:'3px 3px 0 0',minHeight:val?2:0,transition:'all 0.15s',boxShadow:active?`0 0 10px ${color}50`:'none'}}/>
+            <div style={{fontSize:10,color:active?color:'#4a5568',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'100%',textAlign:'center',fontWeight:active?700:400,transition:'color 0.15s'}}>{d.date||d.label||''}</div>
+          </div>
+        );
+      })}
+
+      {tooltip!=null && td && (
+        <div style={{
+          position:'fixed',zIndex:9999,pointerEvents:'none',
+          left:tipLeft,top:tipTop,
+          background:'rgba(8,15,30,0.97)',
+          border:`1px solid ${tc}50`,
+          borderRadius:12,padding:'12px 16px',minWidth:tipW,
+          boxShadow:'0 16px 40px rgba(0,0,0,0.7)',whiteSpace:'nowrap'
+        }}>
+          {(td.fullDate||td.date)?(
+            <div style={{fontSize:11,color:'#475569',fontWeight:600,marginBottom:8,textTransform:'uppercase',letterSpacing:'0.06em'}}>
+              📅 {fmtD(td.fullDate||td.date)}
+            </div>
+          ):(
+            <div style={{fontSize:11,color:'#475569',fontWeight:600,marginBottom:8}}>{td.label}</div>
+          )}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:20,marginBottom:6}}>
+            <span style={{fontSize:12,color:'#475569'}}>{td.pnl!=null?(T.dailyPnl||'Daily P&L'):'Trades'}</span>
+            <span style={{fontSize:20,fontWeight:900,fontFamily:"'Barlow Condensed',sans-serif",color:tc}}>
+              {td.pnl!=null?fmtC(tval):tval}
+            </span>
+          </div>
+          {td.count!=null&&(
+            <div style={{borderTop:'1px solid #1e2d45',paddingTop:6,marginTop:2,fontSize:12,color:'#475569'}}>
+              {T.tradeCount?T.tradeCount(td.count):`${td.count} trade${td.count!==1?'s':''}`}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Auth handled by Firebase
+const GAMMA_LEVELS = ["1D Max","Call Resistance","Call Resistance 0DTE","Gamma Wall","Gamma Wall 0DTE","HVL","HVL 0DTE","Put Support","Put Support 0DTE","1D Min"];
+const DIRECTIONS = ["Long","Short"];
+const YES_NO = ["Yes","No"];
+const PSYCHOLOGY_OPTIONS = ["◈ Anxious","◇ Insecure","◉ Neutral","◆ Focused","★ In the Zone","▲ Impulsive","◌ Tired"];
+const PSYCH_CONFIG = {
+  "◈ Anxious":    { initial:"A",  color:"#ef4444", bg:"rgba(239,68,68,0.15)",    label:"Anxious",     glow:"#ef444440" },
+  "◇ Insecure":   { initial:"I",  color:"#f97316", bg:"rgba(249,115,22,0.15)",   label:"Insecure",    glow:"#f9731640" },
+  "◉ Neutral":    { initial:"N",  color:"#94a3b8", bg:"rgba(148,163,184,0.15)",  label:"Neutral",     glow:"#94a3b840" },
+  "◆ Focused":    { initial:"F",  color:"#10B981", bg:"rgba(34,197,94,0.15)",    label:"Focused",     glow:"#22c55e40" },
+  "★ In the Zone":{ initial:"Z",  color:"#16A34A", bg:"rgba(22,163,74,0.15)",  label:"In the Zone", glow:"#16A34A40" },
+  "▲ Impulsive":  { initial:"Im", color:"#f59e0b", bg:"rgba(245,158,11,0.15)",   label:"Impulsive",   glow:"#f59e0b40" },
+  "◌ Tired":      { initial:"T",  color:"#475569", bg:"rgba(100,116,139,0.15)",  label:"Tired",       glow:"#64748b40" },
+};
+const STRATEGY_FOLLOWED = ["Yes","No"];
+
+const EMPTY_FORM = {
+  tradeN:"", date: new Date().toISOString().split("T")[0], symbol:"", direction:"Long", contracts:"",
+  entryHour:"", exitHour:"", strategy:"", gammaLevels:[],
+  entryPrice:"", targetPrice:"", stopPrice:"",
+  partialType:"None",
+  partial1Price:"", partial1Contracts:"", partial1Hit:"No",
+  partial2Price:"", partial2Contracts:"", partial2Hit:"No",
+  finalTargetPrice:"", finalTargetHit:"No", actualFinalLevel:"",
+  profitTarget:"", actualPnl:"", strategyFollowed:"Yes", stopRespected:"Yes", psychology:"",
+  tradeRating:0,
+  comments:"", chartImage:"",
+};
+
+const DARK = {
+  bg:"#0F172A",
+  panel:"#0d1424",
+  card:"#1E293B",
+  border:"#334155",
+  borderHi:"#3d4f66",
+  accent:"#22C55E",
+  blue:"#22C55E",     
+  green:"#10B981",    
+  red:"#EF4444",      
+  amber:"#F59E0B",    
+  purple:"#16A34A",   
+  cyan:"#10B981",     
+  text:"#FFFFFF",     
+  muted:"#475569",    
+  sub:"#94A3B8",      
+};
+const LIGHT = {
+  bg:"#FFFFFF",
+  panel:"#F1F5F9",
+  card:"#F1F5F9",
+  border:"#CBD5E1",
+  borderHi:"#94A3B8",
+  accent:"#22C55E",
+  blue:"#22C55E",
+  green:"#10B981",
+  red:"#EF4444",
+  amber:"#F59E0B",
+  purple:"#16A34A",
+  cyan:"#10B981",
+  text:"#0F172A",
+  muted:"#475569",
+  sub:"#475569",
+};
+
+let C = DARK;
+
+
+const iS_base = {
+  borderRadius:10, padding:"10px 14px", width:"100%", fontSize:14,
+  outline:"none", fontFamily:"'Barlow Condensed', sans-serif",
+};
+
+function fmt(n) {
+  if (n===undefined||n===null||n==="") return "—";
+  return (n>=0?"+$":"-$") + Math.abs(n).toLocaleString("en-US",{maximumFractionDigits:0});
+}
+
+function calcMetrics(trades) {
+  if (!trades.length) return {winRate:0,profitFactor:0,avgWin:0,avgLoss:0,totalPnl:0,totalTrades:0,maxDrawdown:0,bestStrategy:"-",stratFollowedRate:0,avgRating:0,disciplineScore:0};
+  const wins = trades.filter(t=>t.actualPnl>0);
+  const losses = trades.filter(t=>t.actualPnl<0);
+  const totalWins = wins.reduce((s,t)=>s+t.actualPnl,0);
+  const totalLoss = Math.abs(losses.reduce((s,t)=>s+t.actualPnl,0));
+  const totalPnl = trades.reduce((s,t)=>s+t.actualPnl,0);
+  const winRate = wins.length/trades.length*100;
+  const profitFactor = totalLoss===0?totalWins:totalWins/totalLoss;
+  const avgWin = wins.length?totalWins/wins.length:0;
+  const avgLoss = losses.length?totalLoss/losses.length:0;
+  const stratFollowedRate = trades.filter(t=>t.strategyFollowed==="Yes").length/trades.length*100;
+  const stopRespectedTrades = trades.filter(t=>t.stopRespected!==undefined&&t.stopRespected!==null&&t.stopRespected!=="");
+  const stopRespectedRate = stopRespectedTrades.length ? stopRespectedTrades.filter(t=>t.stopRespected==="Yes").length/stopRespectedTrades.length*100 : null;
+  let peak=0,cumPnl=0,maxDD=0;
+  for (const t of trades){cumPnl+=t.actualPnl;if(cumPnl>peak)peak=cumPnl;const dd=peak-cumPnl;if(dd>maxDD)maxDD=dd;}
+  const stratPnl={};
+  trades.forEach(t=>{if(!stratPnl[t.strategy])stratPnl[t.strategy]=0;stratPnl[t.strategy]+=t.actualPnl;});
+  const bestStrategy=Object.entries(stratPnl).sort((a,b)=>b[1]-a[1])[0]?.[0]||"-";
+    const rated=trades.filter(t=>t.tradeRating>0);
+  const avgRating=rated.length?rated.reduce((s,t)=>s+(t.tradeRating||0),0)/rated.length:0;
+  const planScore=stratFollowedRate;
+  const stopScore=stopRespectedRate!==null ? stopRespectedRate : (losses.length===0?100:(()=>{
+    const bad=losses.filter(t=>{const stop=parseFloat(t.stopPrice)||0,entry=parseFloat(t.entryPrice)||0,contracts=parseFloat(t.contracts)||1;const maxL=stop>0&&entry>0?Math.abs(stop-entry)*contracts*50:0;return maxL>0&&Math.abs(t.actualPnl)>maxL*1.15;});
+    return Math.max(0,100-(bad.length/losses.length)*100);
+  })());
+  const ratingScore=avgRating>0?(avgRating/5)*100:planScore;
+  const disciplineScore=Math.round((planScore+stopScore+ratingScore)/3);
+  return {winRate,profitFactor,avgWin,avgLoss,totalPnl,totalTrades:trades.length,maxDrawdown:maxDD,bestStrategy,stratFollowedRate,stopRespectedRate,avgRating,disciplineScore};
+}
+
+function Tag({color=C.accent,children,small}){
+  return <span style={{display:"inline-flex",alignItems:"center",padding:small?"2px 6px":"3px 10px",fontSize:small?10:11,fontWeight:600,background:color+"18",color:color,border:`1px solid ${color}30`,borderRadius:20,whiteSpace:"nowrap"}}>{children}</span>;
+}
+
+function SectionHeader({title}){
+  return (
+    <div style={{gridColumn:"1/-1",marginTop:16,marginBottom:4}}>
+      <span style={{fontSize:13,fontWeight:700,color:C.sub}}>{title}</span>
+    </div>
+  );
+}
+
+function Field({label,span,children,lS}){
+  const labelStyle = lS || {fontSize:15, color:'#94A3B8', marginBottom:6, display:'block', fontWeight:500};
+  return (
+    <div style={span?{gridColumn:`span ${span}`}:{}}>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+
+
+
+
+function NewsView({theme, C, T}){
+  const containerRef = React.useRef(null);
+
+  React.useEffect(()=>{
+    if(!containerRef.current) return;
+
+    
+    containerRef.current.innerHTML = "";
+
+    
+    const widgetDiv = document.createElement("div");
+    widgetDiv.className = "tradingview-widget-container__widget";
+    containerRef.current.appendChild(widgetDiv);
+
+    
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-events.js";
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      colorTheme: theme==="light" ? "light" : "dark",
+      isTransparent: false,
+      width: "1050",
+      height: "600",
+      locale: "en",
+      importanceFilter: "-1,0,1",
+      countryFilter: "us"
+    });
+    containerRef.current.appendChild(script);
+
+    return () => {
+      if(containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [theme]);
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", height:"calc(100vh - 160px)"}}>
+      {/* Header */}
+      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8, flexShrink:0, paddingRight:24}}>
+        <div style={{display:"flex", alignItems:"center", gap:16}}>
+          <span style={{fontSize:22, fontWeight:800, color:C.text}}>{(T&&T.newsTitle)||"Economic Calendar"}</span>
+          <span style={{fontSize:14, color:"#22c55e", fontWeight:700}}>● {(T&&T.newsRealtime)||"Real-time · USD"}</span>
+          <span style={{fontSize:14, color:C.muted}}>via <span style={{color:"#2962ff", fontWeight:700}}>TradingView</span></span>
+        </div>
+        <a
+          href="https://www.tradingview.com/economic-calendar/"
+          target="_blank"
+          rel="noreferrer"
+          style={{fontSize:13, fontWeight:700, color:C.accent, textDecoration:"none"}}
+        >
+          {(T&&T.newsOpenFull)||"Open full"} ↗
+        </a>
+      </div>
+
+      {/* TradingView Widget — centralizado */}
+      <style>{`
+        .tradingview-widget-container,
+        .tradingview-widget-container__widget,
+        .tradingview-widget-container iframe {
+          width: 1050px !important;
+          max-width: 90vw !important;
+          height: calc(100vh - 130px) !important;
+          min-height: 480px !important;
+          border-radius: 12px !important;
+        }
+      `}</style>
+      <div style={{display:"flex", justifyContent:"center", marginTop:16}}>
+        <div
+          ref={containerRef}
+          className="tradingview-widget-container"
+          style={{width:"1050px", maxWidth:"90vw", height:"calc(100vh - 130px)", minHeight:480, borderRadius:12, overflow:"hidden"}}
+        />
+      </div>
+    </div>
+  );
+}
+
+
+const FINNHUB_KEY = "d6lt5r9r01quej91cumgd6lt5r9r01quej91cun0";
+
+
+const TICKER_DEFS = [
+  {name:"NQ",   yah:"NQ=F",     bn:null, fh:"QQQ",   fxs:null},
+  {name:"ES",   yah:"ES=F",     bn:null, fh:"SPY",   fxs:null},
+  {name:"YM",   yah:"YM=F",     bn:null, fh:"DIA",   fxs:null},
+  {name:"RTY",  yah:"RTY=F",    bn:null, fh:"IWM",   fxs:null},
+  {name:"GC",   yah:"GC=F",     bn:null, fh:"GLD",   fxs:null},
+  {name:"CL",   yah:"CL=F",     bn:null, fh:"USO",   fxs:null},
+  {name:"SI",   yah:"SI=F",     bn:null, fh:"SLV",   fxs:null},
+  {name:"NG",   yah:"NG=F",     bn:null, fh:"UNG",   fxs:null},
+  {name:"AAPL", yah:null,       bn:null, fh:"AAPL",  fxs:null},
+  {name:"NVDA", yah:null,       bn:null, fh:"NVDA",  fxs:null},
+  {name:"MSFT", yah:null,       bn:null, fh:"MSFT",  fxs:null},
+  {name:"TSLA", yah:null,       bn:null, fh:"TSLA",  fxs:null},
+  {name:"SPY",  yah:null,       bn:null, fh:"SPY",   fxs:null},
+  {name:"QQQ",  yah:null,       bn:null, fh:"QQQ",   fxs:null},
+  {name:"DXY",  yah:"DX-Y.NYB", bn:null, fh:"UUP",   fxs:null},
+  {name:"VIX",  yah:"^VIX",     bn:null, fh:"VIXY",  fxs:null},
+];
+
+
+
+const _mktCache = {}; // {name: {pct, ts}}
+const CACHE_TTL = 60000; // 1 minute
+
+
+const YAH_SYMS = [
+  {name:"NQ",  yah:"NQ=F"},  {name:"ES",  yah:"ES=F"},
+  {name:"YM",  yah:"YM=F"},  {name:"RTY", yah:"RTY=F"},
+  {name:"GC",  yah:"GC=F"},  {name:"CL",  yah:"CL=F"},
+  {name:"SI",  yah:"SI=F"},  {name:"NG",  yah:"NG=F"},
+  {name:"AAPL",yah:"AAPL"},  {name:"NVDA",yah:"NVDA"},
+  {name:"MSFT",yah:"MSFT"},  {name:"TSLA",yah:"TSLA"},
+  {name:"SPY", yah:"SPY"},   {name:"QQQ", yah:"QQQ"},
+  {name:"DXY", yah:"DX-Y.NYB"},{name:"VIX",yah:"^VIX"},
+];
+
+const FH_FALLBACK = {
+  NQ:"QQQ", ES:"SPY", YM:"DIA", RTY:"IWM",
+  GC:"GLD", CL:"USO", SI:"SLV", NG:"UNG",
+  AAPL:"AAPL", NVDA:"NVDA", MSFT:"MSFT", TSLA:"TSLA",
+  SPY:"SPY", QQQ:"QQQ", DXY:"UUP", VIX:"VIXY"
+};
+
+
+const PROXIES = [
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+];
+
+async function fetchYahooBatchAll(){
+  const syms = YAH_SYMS.map(d=>d.yah).join(",");
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=regularMarketChangePercent,regularMarketPrice,regularMarketPreviousClose`;
+  
+  const attempts = [
+    ()=>fetch(url, {signal:AbortSignal.timeout(6000), headers:{"Accept":"application/json"}}),
+    ...PROXIES.map(p=>()=>fetch(p(url), {signal:AbortSignal.timeout(7000)}))
+  ];
+  for(const attempt of attempts){
+    try{
+      const r = await attempt();
+      if(!r.ok) continue;
+      const j = await r.json();
+      const results = j?.quoteResponse?.result || j?.result || [];
+      if(!results.length) continue;
+      const out = {};
+      results.forEach(q=>{
+        const def = YAH_SYMS.find(d=>d.yah===q.symbol);
+        if(!def) return;
+        let pct = q.regularMarketChangePercent;
+        if(pct==null && q.regularMarketPrice && q.regularMarketPreviousClose && q.regularMarketPreviousClose!==0){
+          pct = ((q.regularMarketPrice - q.regularMarketPreviousClose)/q.regularMarketPreviousClose)*100;
+        }
+        if(pct!=null) out[def.name] = pct;
+      });
+      if(Object.keys(out).length > 0) return out;
+    }catch(e){}
+  }
+  return null;
+}
+
+async function fetchFinnhubSingle(sym){
+  try{
+    const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(sym)}&token=${FINNHUB_KEY}`, {signal:AbortSignal.timeout(5000)});
+    if(!r.ok) return null;
+    const j = await r.json();
+    if(!j || !j.c) return null;
+    if(j.dp!=null) return j.dp;
+    if(j.pc && j.pc!==0) return ((j.c-j.pc)/j.pc)*100;
+  }catch(e){}
+  return null;
+}
+
+async function loadAllMarketData(setData){
+  const now = Date.now();
+  
+  const allFresh = YAH_SYMS.every(d=>_mktCache[d.name] && now-_mktCache[d.name].ts < CACHE_TTL);
+  if(allFresh){
+    const cached = {};
+    YAH_SYMS.forEach(d=>{ cached[d.name]=_mktCache[d.name].pct; });
+    setData(cached);
+    return;
+  }
+
+  
+  const yahooData = await fetchYahooBatchAll();
+  if(yahooData && Object.keys(yahooData).length >= 10){
+    // Good batch result — update cache and state
+    Object.entries(yahooData).forEach(([k,v])=>{ _mktCache[k]={pct:v,ts:now}; });
+    setData(prev=>({...prev,...yahooData}));
+
+    
+    const missing = YAH_SYMS.filter(d=>yahooData[d.name]==null);
+    for(const d of missing){
+      const fhSym = FH_FALLBACK[d.name];
+      if(!fhSym) continue;
+      await new Promise(r=>setTimeout(r,350));
+      const pct = await fetchFinnhubSingle(fhSym);
+      if(pct!=null){
+        _mktCache[d.name]={pct,ts:now};
+        setData(prev=>({...prev,[d.name]:pct}));
+      }
+    }
+    return;
+  }
+
+  
+  console.warn("Yahoo batch failed, using Finnhub fallback");
+  for(const d of YAH_SYMS){
+    const fhSym = FH_FALLBACK[d.name];
+    if(!fhSym) continue;
+    
+    if(_mktCache[d.name] && now-_mktCache[d.name].ts < CACHE_TTL){
+      setData(prev=>({...prev,[d.name]:_mktCache[d.name].pct}));
+      continue;
+    }
+    await new Promise(r=>setTimeout(r,350));
+    const pct = await fetchFinnhubSingle(fhSym);
+    if(pct!=null){
+      _mktCache[d.name]={pct,ts:now};
+      setData(prev=>({...prev,[d.name]:pct}));
+    }
+  }
+}
+
+function TickerBar(){
+  const [data, setData] = React.useState({});
+  const th=localStorage.getItem("tj_theme")||"dark";
+  const TC=th==="dark"?DARK:LIGHT;
+  const fhWsRef = React.useRef(null);
+  const prevRef = React.useRef({});
+
+  
+
+  React.useEffect(()=>{
+    loadAllMarketData(setData);
+    const id = setInterval(()=>loadAllMarketData(setData), 90000);
+    return ()=>{ clearInterval(id); };
+  },[]);
+
+  const items   = TICKER_DEFS.map(d=>({name:d.name, chg:data[d.name]??null}));
+  const doubled = [...items,...items];
+
+  return (
+    <div style={{background:TC.panel,borderBottom:`1px solid ${TC.border}`,overflow:"hidden",height:42,display:"flex",alignItems:"center"}}>
+      <style>{`
+        @keyframes tickerMove{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .ticker-track{display:flex;gap:0;white-space:nowrap;animation:tickerMove 50s linear infinite;will-change:transform;}
+        .ticker-track:hover{animation-play-state:paused;}
+      `}</style>
+      <div style={{overflow:"hidden",flex:1,position:"relative"}}>
+        <div className="ticker-track">
+          {doubled.map((t,i)=>{
+            const loading = t.chg===null;
+            const pos     = !loading && t.chg>=0;
+            const fmt     = loading?"...":(pos?"+":"")+t.chg.toFixed(2)+"%";
+            return (
+              <span key={i} style={{display:"inline-flex",alignItems:"center",gap:8,padding:"0 24px",borderRight:"1px solid #1e2235",fontSize:13,fontWeight:700,height:42,letterSpacing:"0.02em"}}>
+                <span style={{color:TC.sub}}>{t.name}</span>
+                <span style={{color:loading?"#475569":pos?"#22c55e":"#ef4444"}}>{fmt}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function CalendarView({trades, C, T}){
+  const today = new Date();
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+
+  const monthNames = (T&&T.calMonths) || ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dayNames = (T&&T.calDays) || ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+  
+  const dayMap = useMemo(()=>{
+    const m = {};
+    trades.forEach(t=>{
+      if(!t.date) return;
+      const d = t.date.slice(0,10);
+      if(!m[d]) m[d] = {pnl:0, count:0};
+      m[d].pnl += (parseFloat(t.actualPnl)||0);
+      m[d].count += 1;
+    });
+    return m;
+  }, [trades]);
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+
+  function prevMonth(){ if(viewMonth===0){setViewMonth(11);setViewYear(y=>y-1);}else{setViewMonth(m=>m-1);} }
+  function nextMonth(){ if(viewMonth===11){setViewMonth(0);setViewYear(y=>y+1);}else{setViewMonth(m=>m+1);} }
+
+  const cells = [];
+  for(let i=0;i<firstDay;i++) cells.push(null);
+  for(let d=1;d<=daysInMonth;d++) cells.push(d);
+
+  const todayStr = today.toISOString().slice(0,10);
+
+  
+  const monthTrades = trades.filter(t=>t.date&&t.date.startsWith(`${viewYear}-${String(viewMonth+1).padStart(2,'0')}`));
+  const monthPnl = monthTrades.reduce((s,t)=>s+(parseFloat(t.actualPnl)||0),0);
+  const monthWins = monthTrades.filter(t=>t.actualPnl>0).length;
+
+  return (
+    <div>
+      {/* Month header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,padding:"16px 22px",background:C.card,border:`1px solid ${C.border}`,borderRadius:16}}>
+        <button onClick={prevMonth} style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,cursor:"pointer",padding:"8px 18px",fontSize:16,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>‹</button>
+        <div style={{textAlign:"center"}}>
+          <div style={{fontSize:26,fontWeight:800,color:C.text,fontFamily:"'Barlow Condensed',sans-serif"}}>{monthNames[viewMonth]} {viewYear}</div>
+          <div style={{fontSize:13,color:C.muted,marginTop:4}}>
+            {(T&&T.tradeCount)?T.tradeCount(monthTrades.length):(monthTrades.length+" trades")} &nbsp;·&nbsp;
+            <span style={{color:monthPnl>=0?C.green:C.red,fontWeight:700}}>{monthPnl>=0?"+$":"-$"}{Math.abs(monthPnl).toLocaleString("en-US",{maximumFractionDigits:0})}</span>
+            &nbsp;·&nbsp; {monthWins}{(T&&T.calWin)||"V"} / {monthTrades.length-monthWins}{(T&&T.calLoss)||"D"}
+          </div>
+        </div>
+        <button onClick={nextMonth} style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,cursor:"pointer",padding:"8px 18px",fontSize:16,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>›</button>
+      </div>
+
+      {/* Calendar grid */}
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,overflow:"hidden"}}>
+        {/* Day headers */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:`1px solid ${C.border}`}}>
+          {dayNames.map(d=>(
+            <div key={d} style={{padding:"12px 0",textAlign:"center",fontSize:13,fontWeight:700,color:C.muted}}>{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)"}}>
+          {cells.map((day,i)=>{
+            if(!day) return <div key={`e${i}`} style={{minHeight:90,borderRight:`1px solid ${C.border}`,borderBottom:`1px solid ${C.border}`,background:C.bg,opacity:0.3}}/>;
+
+            const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            const data = dayMap[dateStr];
+            const isToday = dateStr===todayStr;
+            const isPositive = data && data.pnl > 0;
+            const isNegative = data && data.pnl < 0;
+
+            return (
+              <div key={day} style={{
+                minHeight:90,
+                borderRight:`1px solid ${C.border}`,
+                borderBottom:`1px solid ${C.border}`,
+                padding:"10px 12px",
+                background: isPositive?`${C.green}12`:isNegative?`${C.red}10`:C.card,
+                position:"relative",
+                transition:"background 0.2s",
+                borderLeft: isToday?`3px solid ${C.accent}`:undefined,
+              }}>
+                <div style={{
+                  fontSize:14,fontWeight:700,
+                  color:isToday?C.accent:C.muted,
+                  marginBottom:6
+                }}>{day}</div>
+                {data && (<>
+                  <div style={{
+                    fontSize:15,fontWeight:800,
+                    color:isPositive?C.green:C.red,
+                    fontFamily:"'Barlow Condensed',sans-serif",
+                    lineHeight:1.2,
+                    marginBottom:3
+                  }}>{isPositive?"+$":"-$"}{Math.abs(data.pnl).toLocaleString("en-US",{maximumFractionDigits:0})}</div>
+                  <div style={{fontSize:11,color:C.muted}}>{(T&&T.tradeCount)?T.tradeCount(data.count):(data.count+(data.count!==1?" trades":" trade"))}</div>
+                </>)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const logo = "image1.jpg";
+
+function LoginScreen({onLogin}){
+  const [mode,setMode]      = React.useState("login"); 
+  const [email,setEmail]    = React.useState("");
+  const [pw,setPw]          = React.useState("");
+  const [pw2,setPw2]        = React.useState("");
+  const [name,setName]      = React.useState("");
+  const [error,setError]    = React.useState("");
+  const [loading,setLoading]= React.useState(false);
+  const [show,setShow]      = React.useState(false);
+  const [loginTheme,setLoginTheme] = React.useState(()=>localStorage.getItem("tj_theme")||"dark");
+  const LC = loginTheme==="dark"?DARK:LIGHT;
+
+  function toggleLoginTheme(){
+    const next=loginTheme==="dark"?"light":"dark";
+    setLoginTheme(next);
+    localStorage.setItem("tj_theme",next);
+  }
+
+  const [verifyPending, setVerifyPending] = React.useState(false);
+  const [verifyEmail, setVerifyEmail]     = React.useState("");
+  const [forgotMode, setForgotMode]       = React.useState(false);
+  const [resetSent, setResetSent]         = React.useState(false);
+  const [generatedUsername, setGeneratedUsername] = React.useState("");
+
+  const [usernameInput, setUsernameInput] = React.useState("");
+
+  async function sendReset(){
+    if(!usernameInput.trim()){ setError("Please enter your username."); return; }
+    setLoading(true); setError("");
+    try{
+      
+      const snap = await window.fsGetDocs(
+        window.fsQuery(window.fsCollection(window.db,"usernames"), window.fsWhere("username","==",usernameInput.trim().toLowerCase()))
+      );
+      if(snap.empty){
+        setError("Username not found. Check your username and try again.");
+        setLoading(false); return;
+      }
+      const userDoc = snap.docs[0].data();
+      await window.fbResetPassword(window.auth, userDoc.email);
+      setResetSent(true);
+    }catch(e){
+      setError("Something went wrong. Please try again.");
+      console.error(e);
+    }
+    setLoading(false);
+  }
+
+  const verificationSettings = {
+    url: window.location.href, // redirect back to the app after verification
+    handleCodeInApp: false,
+  };
+
+  async function attempt(){
+    setError(""); setLoading(true);
+    try{
+      if(mode==="register"){
+        if(!name.trim()){setError("Please enter your name.");setLoading(false);return;}
+        if(pw!==pw2){setError("Passwords do not match.");setLoading(false);return;}
+        if(pw.length<6){setError("Password must be at least 6 characters.");setLoading(false);return;}
+
+        // Generate unique username: firstname + random suffix e.g. "daniel_x7k2"
+        const base = name.trim().split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12) || "trader";
+        let username = "";
+        let attempts = 0;
+        while(attempts < 10){
+          const suffix = Math.random().toString(36).slice(2,6);
+          const candidate = `${base}_${suffix}`;
+          // Check uniqueness in Firestore
+          const snap = await window.fsGetDocs(
+            window.fsQuery(window.fsCollection(window.db,"usernames"), window.fsWhere("username","==",candidate))
+          );
+          if(snap.empty){ username = candidate; break; }
+          attempts++;
+        }
+        if(!username) username = `trader_${Date.now().toString(36).slice(-6)}`;
+
+        const cred = await window.fbCreateUser(window.auth, email.trim(), pw);
+        await window.fbUpdateProfile(cred.user, {displayName: name.trim()});
+
+        // Save username → email mapping in global collection (for password reset lookup)
+        await window.fsSetDoc(window.fsDoc(window.db,"usernames", username), {
+          username, email: email.trim(), uid: cred.user.uid, createdAt: Date.now()
+        });
+        // Also save username in user's own profile
+        await window.fsSetDoc(window.fsDoc(window.db,`users/${cred.user.uid}/settings`,"profile"), {
+          username, displayName: name.trim()
+        }, {merge:true});
+
+        await window.fbSendEmailVerification(cred.user, verificationSettings);
+        await window.fbSignOut(window.auth);
+        setVerifyEmail(email.trim());
+        setGeneratedUsername(username);
+        setVerifyPending(true);
+      } else {
+        const cred = await window.fbSignIn(window.auth, email.trim(), pw);
+        // No verification check on login — only new registrations require it
+        onLogin(cred.user);
+      }
+    }catch(e){
+      const msgs = {
+        "auth/user-not-found":"No account found with this email.",
+        "auth/wrong-password":"Incorrect password.",
+        "auth/invalid-email":"Invalid email address.",
+        "auth/email-already-in-use":"This email is already registered.",
+        "auth/invalid-credential":"Incorrect email or password.",
+        "auth/too-many-requests":"Too many attempts. Try again later.",
+      };
+      setError(msgs[e.code]||e.message||"Authentication error.");
+    }
+    setLoading(false);
+  }
+
+  // Live tickers
+  const [liveTickers,setLiveTickers]=React.useState([]);
+  React.useEffect(()=>{
+    // Use the same batched Yahoo engine as the main app
+    async function fetchTickers(){
+      const tmp = {};
+      const updateFn = patch => Object.assign(tmp, typeof patch === "function" ? patch(tmp) : patch);
+      await loadAllMarketData(updateFn);
+      // Convert to login ticker format
+      const LOGIN_NAMES = ["QQQ","SPY","DIA","IWM","GLD","USO","AAPL","NVDA","TSLA","MSFT","VIX","NQ","ES","TSLA","RTY","CL"];
+      const results = LOGIN_NAMES
+        .filter(n=>tmp[n]!=null)
+        .map(n=>{ const pct=tmp[n]; return{label:n,pct:`${pct>=0?"+":""}${pct.toFixed(2)}%`,pos:pct>=0}; });
+      if(results.length > 0) setLiveTickers(results);
+    }
+    fetchTickers();
+    const id=setInterval(fetchTickers,90000); // refresh every 90s to be gentle on APIs
+    return()=>clearInterval(id);
+  },[]);
+
+  const _tBase = liveTickers.length>0 ? liveTickers : YAH_SYMS.map(d=>({label:d.name,pct:"+0.00%",pos:true}));
+  // Repeat enough times so the track is always wider than the screen (need at least 2 full copies for seamless loop)
+  const tickerDouble = [..._tBase,..._tBase,..._tBase,..._tBase,..._tBase,..._tBase];
+
+  const candles=[{o:42,h:58,l:38,c:55},{o:55,h:62,l:50,c:48},{o:48,h:54,l:40,c:52},{o:52,h:70,l:49,c:68},{o:68,h:75,l:62,c:64},{o:64,h:72,l:58,c:71},{o:71,h:80,l:65,c:76},{o:76,h:82,l:68,c:70},{o:70,h:76,l:60,c:63},{o:63,h:68,l:55,c:66},{o:66,h:78,l:62,c:75},{o:75,h:88,l:70,c:85},{o:85,h:92,l:80,c:82},{o:82,h:86,l:74,c:78},{o:78,h:84,l:72,c:80},{o:80,h:90,l:76,c:88},{o:88,h:95,l:82,c:91},{o:91,h:98,l:84,c:87},{o:87,h:92,l:78,c:80},{o:80,h:85,l:70,c:73},{o:73,h:80,l:65,c:77},{o:77,h:88,l:72,c:85},{o:85,h:94,l:80,c:92},{o:92,h:100,l:86,c:96},{o:96,h:102,l:88,c:90},{o:90,h:96,l:82,c:84},{o:84,h:90,l:76,c:88}];
+  const svgH=120,svgW=600;
+  const allVals=candles.flatMap(c=>[c.h,c.l]);
+  const minV=Math.min(...allVals)-5,maxV=Math.max(...allVals)+5;
+  const toY=v=>svgH-((v-minV)/(maxV-minV))*svgH;
+  const cw=svgW/candles.length;
+
+  const iS={width:"100%",background:LC.bg,border:`1px solid ${error?"#ef4444":LC.border}`,borderRadius:12,color:LC.text,padding:"14px 48px 14px 18px",fontSize:16,outline:"none",fontFamily:"'Barlow Condensed',sans-serif",boxSizing:"border-box",transition:"border-color 0.2s"};
+
+  // ── FORGOT PASSWORD SCREEN ──
+  if(forgotMode) return (
+    <div style={{minHeight:"100vh",background:LC.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",padding:20}}>
+      <div style={{background:LC.card,border:`1px solid ${LC.border}`,borderRadius:24,padding:"48px 40px",maxWidth:460,width:"100%",textAlign:"center",boxShadow:"0 32px 80px rgba(0,0,0,0.4)"}}>
+        {resetSent ? (<>
+          <div style={{fontSize:64,marginBottom:16}}>📬</div>
+          <div style={{fontSize:26,fontWeight:900,color:LC.text,marginBottom:10}}>Reset link sent!</div>
+          <div style={{fontSize:15,color:LC.muted,lineHeight:1.6,marginBottom:24}}>
+            We found your account and sent a password reset link to your registered email address.
+          </div>
+          <div style={{fontSize:13,color:LC.muted,lineHeight:1.7,marginBottom:32,background:LC.panel,borderRadius:12,padding:"14px 16px",border:`1px solid ${LC.border}`}}>
+            Check your inbox and spam folder. The link expires in 1 hour.
+          </div>
+          <button onClick={()=>{setForgotMode(false);setResetSent(false);setUsernameInput("");setError("");}}
+            style={{width:"100%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontFamily:"inherit",fontWeight:800,cursor:"pointer",fontSize:17}}>
+            ← Back to Sign In
+          </button>
+        </>) : (<>
+          <div style={{fontSize:64,marginBottom:16}}>🔑</div>
+          <div style={{fontSize:26,fontWeight:900,color:LC.text,marginBottom:8}}>Forgot your password?</div>
+          <div style={{fontSize:15,color:LC.muted,lineHeight:1.6,marginBottom:28}}>
+            Enter your <strong style={{color:LC.text}}>username</strong> and we'll send a reset link to your registered email.
+          </div>
+          <input
+            type="text" value={usernameInput}
+            onChange={e=>{setUsernameInput(e.target.value.toLowerCase().replace(/\s/g,""));setError("");}}
+            placeholder="your_username" autoFocus
+            onKeyDown={e=>e.key==="Enter"&&sendReset()}
+            style={{width:"100%",background:LC.bg,border:`1px solid ${error?"#ef4444":LC.border}`,borderRadius:12,color:LC.text,padding:"14px 18px",fontSize:18,outline:"none",fontFamily:"monospace",boxSizing:"border-box",marginBottom:error?8:16,letterSpacing:"0.05em"}}
+          />
+          {error&&<div style={{color:"#ef4444",fontSize:13,fontWeight:600,marginBottom:14,textAlign:"left"}}>⚠️ {error}</div>}
+          <button onClick={sendReset} disabled={loading||!usernameInput.trim()}
+            style={{width:"100%",background:loading||!usernameInput.trim()?"#0F172A":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontFamily:"inherit",fontWeight:800,cursor:loading||!usernameInput.trim()?"not-allowed":"pointer",fontSize:17,marginBottom:12,opacity:loading||!usernameInput.trim()?0.5:1}}>
+            {loading?"⏳ Looking up account...":"📧 Send reset link"}
+          </button>
+          <button onClick={()=>{setForgotMode(false);setError("");setUsernameInput("");}}
+            style={{width:"100%",background:"none",border:`1px solid ${LC.border}`,borderRadius:12,padding:"12px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,color:LC.muted}}>
+            ← Back to Sign In
+          </button>
+        </>)}
+      </div>
+    </div>
+  );
+
+  // ── VERIFY PENDING SCREEN ──
+  if(verifyPending) return (
+    <div style={{minHeight:"100vh",background:LC.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",padding:20}}>
+      <div style={{background:LC.card,border:`1px solid ${LC.border}`,borderRadius:24,padding:"48px 40px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 32px 80px rgba(0,0,0,0.4)"}}>
+        <div style={{fontSize:64,marginBottom:16}}>📧</div>
+        <div style={{fontSize:28,fontWeight:900,color:LC.text,marginBottom:10}}>Check your inbox!</div>
+        <div style={{fontSize:15,color:LC.muted,lineHeight:1.6,marginBottom:24}}>
+          A confirmation link was sent to your email. Click it to activate your account.
+        </div>
+
+        {/* Username box — save this! */}
+        {generatedUsername&&(
+          <div style={{background:"linear-gradient(135deg,#22C55E20,#3b82f620)",border:"2px solid #22C55E",borderRadius:16,padding:"20px 24px",marginBottom:24}}>
+            <div style={{fontSize:12,fontWeight:700,color:"#22C55E",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8}}>🎉 Your username</div>
+            <div style={{fontSize:28,fontWeight:900,color:LC.text,letterSpacing:"0.05em",fontFamily:"monospace"}}>{generatedUsername}</div>
+            <div style={{fontSize:12,color:LC.muted,marginTop:8,lineHeight:1.5}}>
+              Save this! You'll need it to recover your password if you ever forget it.
+            </div>
+          </div>
+        )}
+
+        <div style={{fontSize:13,color:LC.muted,lineHeight:1.7,marginBottom:28,background:LC.panel,borderRadius:12,padding:"14px 16px",border:`1px solid ${LC.border}`}}>
+          Check your spam folder if you don't see the email.
+        </div>
+        <button onClick={()=>{ setVerifyPending(false); setMode("login"); setEmail(verifyEmail); setPw(""); setError(""); }}
+          style={{width:"100%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontFamily:"inherit",fontWeight:800,cursor:"pointer",fontSize:17,marginBottom:12}}>
+          ✅ I confirmed my email — Sign In
+        </button>
+        <button onClick={async()=>{
+            try{
+              const cred = await window.fbSignIn(window.auth, verifyEmail, pw);
+              await window.fbSendEmailVerification(cred.user, verificationSettings);
+              await window.fbSignOut(window.auth);
+              setError("");
+            }catch(e){ setError("Could not resend. Try signing in again."); }
+          }}
+          style={{width:"100%",background:"none",border:`1px solid ${LC.border}`,borderRadius:12,padding:"12px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,color:LC.muted}}>
+          🔄 Resend confirmation email
+        </button>
+        {error&&<div style={{marginTop:14,color:"#ef4444",fontSize:13,fontWeight:600}}>{error}</div>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:"100vh",background:LC.bg,display:"flex",flexWrap:"wrap",fontFamily:"'Barlow Condensed',sans-serif",overflow:"hidden",position:"relative"}}>
+      <style>{`@keyframes tickerMove{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}.ticker-track{display:flex;gap:0;white-space:nowrap;animation:tickerMove 30s linear infinite;will-change:transform;align-items:center;height:36px;}.ticker-track:hover{animation-play-state:paused;}`}</style>
+      {/* Ticker bar */}
+      <div style={{width:"100%",background:LC.card,borderBottom:`1px solid ${LC.border}`,overflow:"hidden",height:36,display:"flex",alignItems:"center"}}>
+        <div style={{overflow:"hidden",flex:1,position:"relative"}}>
+          <div className="ticker-track">
+            {tickerDouble.map((t,i)=>(
+              <span key={i} style={{fontSize:13,fontWeight:700,color:t.pos?"#22c55e":"#ef4444",letterSpacing:"0.04em",paddingRight:32}}>
+                {t.label} <span style={{color:t.pos?"#22c55e":"#ef4444"}}>{t.pct}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Left panel */}
+      <div className="login-left" style={{width:"50%",padding:"40px 48px",display:"flex",flexDirection:"column",justifyContent:"space-between",borderRight:`1px solid ${LC.border}`,position:"relative",overflow:"hidden",minHeight:"calc(100vh - 36px)",boxSizing:"border-box"}}>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:48}}>
+            <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:22,fontWeight:900,color:"#fff",fontFamily:"'Barlow Condensed',sans-serif"}}>D</span>
+            </div>
+            <span style={{fontSize:22,fontWeight:800,color:LC.text,letterSpacing:"0.05em"}}>MARCON TRADING</span>
+            <button onClick={toggleLoginTheme} title="Toggle theme" style={{marginLeft:"auto",background:LC.card,border:`1px solid ${LC.border}`,borderRadius:10,padding:"7px 14px",cursor:"pointer",color:LC.text,fontSize:13,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
+              {loginTheme==="dark"?"☀️ Light":"🌙 Dark"}
+            </button>
+          </div>
+          <div style={{fontSize:42,fontWeight:900,color:LC.text,lineHeight:1.1,marginBottom:16,animation:"fadeUp 0.5s ease forwards"}}>
+            {mode==="login"?"Welcome back." : "Create your account."}
+          </div>
+          <div style={{fontSize:15,color:LC.muted,maxWidth:380,lineHeight:1.6,marginBottom:40}}>
+            {mode==="login"
+              ? "Track every trade, analyze your psychology, and build consistent profitability."
+              : "Join BullNote Journal and start tracking your performance today."}
+          </div>
+
+          {/* Candle chart decoration */}
+          <div className="lchart" style={{background:loginTheme==="dark"?"#0F172A":"#0d1424",border:"1px solid #1a1f2e",borderRadius:14,padding:"14px 18px",overflow:"hidden",position:"relative",zIndex:1}}>
+            <div style={{fontSize:11,color:"#475569",fontWeight:700,letterSpacing:"0.08em",marginBottom:8}}>MARKET OVERVIEW</div>
+            <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:"100%",height:svgH,display:"block"}} preserveAspectRatio="none">
+              {candles.map((c,i)=>{
+                const x=i*cw+cw*0.15,bull=c.c>=c.o,clr=bull?"#22c55e":"#ef4444";
+                return <g key={i}>
+                  <line x1={x+cw*0.35} y1={toY(c.h)} x2={x+cw*0.35} y2={toY(c.l)} stroke={clr} strokeWidth="1.5" opacity="0.7"/>
+                  <rect x={x} y={toY(Math.max(c.o,c.c))} width={cw*0.7} height={Math.max(2,Math.abs(toY(c.o)-toY(c.c)))} fill={clr} opacity="0.85" rx="1"/>
+                </g>;
+              })}
+            </svg>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"flex",gap:12,marginTop:32,flexWrap:"wrap"}}>
+          {[{icon:"📈",title:"Real-time P&L",desc:"Track every trade live"},{icon:"🧠",title:"AI Psychology",desc:"Understand your mindset"},{icon:"📊",title:"Deep Analytics",desc:"Data-driven insights"}].map((s,i)=>(
+            <div key={i} className="lstat" style={{animationDelay:`${0.3+i*0.1}s`,background:loginTheme==="dark"?"#0F172A":LC.card,border:`1px solid ${LC.border}`,borderRadius:14,padding:"16px 18px",position:"relative",overflow:"hidden",flex:"1 1 140px"}}>
+              <div style={{fontSize:22,marginBottom:6}}>{s.icon}</div>
+              <div style={{fontSize:14,fontWeight:800,color:LC.text,marginBottom:3}}>{s.title}</div>
+              <div style={{fontSize:12,color:LC.muted}}>{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right panel - Auth form */}
+      <div style={{width:"50%",padding:"40px 48px",display:"flex",alignItems:"center",justifyContent:"center",minHeight:"calc(100vh - 36px)",boxSizing:"border-box"}}>
+        <div style={{width:"100%",maxWidth:400}}>
+          {/* Mode toggle */}
+          <div style={{display:"flex",background:LC.card,borderRadius:14,padding:4,marginBottom:32,border:`1px solid ${LC.border}`}}>
+            {["login","register"].map(m=>(
+              <button key={m} onClick={()=>{setMode(m);setError("");}} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:mode===m?"linear-gradient(135deg,#22C55E,#3b82f6)":"transparent",color:mode===m?"#fff":LC.muted,fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,cursor:"pointer",transition:"all 0.2s",letterSpacing:"0.04em"}}>
+                {m==="login"?"Sign In":"Create Account"}
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {mode==="register" && (
+              <div style={{position:"relative"}}>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="Full name" style={{...iS,paddingLeft:"18px"}} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
+              </div>
+            )}
+            <div style={{position:"relative"}}>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email address" style={{...iS,paddingLeft:"18px",borderColor:LC.border}} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
+            </div>
+            <div style={{position:"relative"}}>
+              <input type={show?"text":"password"} value={pw} onChange={e=>setPw(e.target.value)} placeholder="Password" style={iS} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
+              <button onClick={()=>setShow(s=>!s)} style={{position:"absolute",right:16,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:LC.muted,fontSize:18,padding:0}}>{show?"🙈":"👁️"}</button>
+            </div>
+            {mode==="register" && (
+              <div style={{position:"relative"}}>
+                <input type={show?"text":"password"} value={pw2} onChange={e=>setPw2(e.target.value)} placeholder="Confirm password" style={{...iS,borderColor:LC.border}} onKeyDown={e=>e.key==="Enter"&&attempt()}/>
+              </div>
+            )}
+
+            {error && <div style={{color:"#ef4444",fontSize:14,padding:"10px 14px",background:"#ef444415",borderRadius:10,lineHeight:1.4}}>{error}</div>}
+
+            <button onClick={attempt} disabled={loading} style={{width:"100%",background:loading?"#334155":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"15px",fontFamily:"inherit",fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:17,transition:"opacity 0.2s",opacity:loading?0.7:1,marginTop:4,letterSpacing:"0.03em"}}>
+              {loading?"⏳ Please wait...":(mode==="login"?"Sign In →":"Create Account →")}
+            </button>
+
+            {mode==="login" && (
+              <div style={{textAlign:"center",fontSize:13,color:LC.muted,marginTop:4}}>
+                Don't have an account?{" "}
+                <span onClick={()=>{setMode("register");setError("");}} style={{color:"#22C55E",cursor:"pointer",fontWeight:700}}>Sign up free</span>
+              </div>
+            )}
+            {mode==="login" && (
+              <div style={{textAlign:"center",fontSize:13,marginTop:2}}>
+                <span onClick={()=>{setForgotMode(true);setResetSent(false);setError("");}} style={{color:LC.muted,cursor:"pointer",fontWeight:600,textDecoration:"underline",textUnderlineOffset:3}}>Forgot your password?</span>
+              </div>
+            )}
+            {mode==="register" && (
+              <div style={{textAlign:"center",fontSize:13,color:LC.muted,marginTop:4}}>
+                Already have an account?{" "}
+                <span onClick={()=>{setMode("login");setError("");}} style={{color:"#22C55E",cursor:"pointer",fontWeight:700}}>Sign in</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function PsychologyAI({trades, C, lang}){
+  const OPENROUTER_KEY = "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";
+  const [analysis, setAnalysis] = React.useState(null);
+  const [loading, setLoading]   = React.useState(false);
+  const [error, setError]       = React.useState(null);
+  const [apiKey]                = React.useState(()=>localStorage.getItem("openrouter_key")||OPENROUTER_KEY);
+
+  const tradesWithPsych = trades.filter(t=>t.psychology && t.psychology.trim().length > 2);
+
+  const langLabels = {
+    pt:{ title:"Análise Psicológica AI", btn:"Analisar meu psicológico", loading:"Analisando...", noData:"Adicione pelo menos 3 trades com notas psicológicas para obter uma análise.", tradesUsed:"trades analisados", refresh:"Atualizar análise" },
+    es:{ title:"Análisis Psicológico AI", btn:"Analizar mi psicología", loading:"Analizando...", noData:"Agrega al menos 3 trades con notas psicológicas para obtener un análisis.", tradesUsed:"operaciones analizadas", refresh:"Actualizar análisis" },
+    en:{ title:"AI Psychology Analysis", btn:"Analyze my psychology", loading:"Analyzing...", noData:"Add at least 3 trades with psychology notes to get an analysis.", tradesUsed:"trades analyzed", refresh:"Refresh analysis" },
+  };
+  const L = langLabels[lang] || langLabels.en;
+
+  async function analyze(){
+    if(tradesWithPsych.length < 3) return;
+    setLoading(true); setError(null);
+    const entries = tradesWithPsych.slice(0,40).map((t,i)=>
+      `Trade #${t.tradeN||i+1} (${t.date}) — ${t.direction} ${t.symbol} — PnL: ${t.actualPnl>0?"+":""}$${t.actualPnl} — Strategy followed: ${t.strategyFollowed} — Psychology: "${t.psychology}"`
+    ).join("\n");
+    const systemPrompt = lang==="pt"
+      ? "Você é um psicólogo especializado em traders. Analise os registros psicológicos do trader e faça um resumo conciso (máximo 5 parágrafos curtos) identificando: padrões emocionais recorrentes, como o estado mental afeta os resultados, pontos fortes e vulnerabilidades psicológicas, e uma recomendação prática. Seja direto, empático e baseado nos dados. Responda em português."
+      : lang==="es"
+      ? "Eres un psicólogo especializado en traders. Analiza los registros psicológicos del trader y haz un resumen conciso (máximo 5 párrafos cortos) identificando: patrones emocionales recurrentes, cómo el estado mental afecta los resultados, fortalezas y vulnerabilidades psicológicas, y una recomendación práctica. Sé directo, empático y basado en los datos. Responde en español."
+      : "You are a psychologist specialized in traders. Analyze the trader's psychological logs and write a concise summary (max 5 short paragraphs) identifying: recurring emotional patterns, how mental state affects results, psychological strengths and vulnerabilities, and one practical recommendation. Be direct, empathetic and data-driven. Respond in English.";
+    try{
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":`Bearer ${apiKey}`,
+          "HTTP-Referer":"https://bullnote.app",
+          "X-Title":"BullNote Journal"
+        },
+        body:JSON.stringify({
+          model:"meta-llama/llama-3.3-70b-instruct",
+          max_tokens:1000,
+          messages:[
+            {role:"system",content:systemPrompt},
+            {role:"user",content:`Here are the trader journal entries:\n\n${entries}`}
+          ]
+        })
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(`API ${res.status}: ${data?.error?.message||"unknown"}`);
+      const text = data?.choices?.[0]?.message?.content;
+      if(!text) throw new Error("Empty response");
+      setAnalysis({text, count:tradesWithPsych.length, date:new Date().toLocaleTimeString()});
+    }catch(e){ setError("⚠️ "+(e?.message||"Error")); }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:28}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,gap:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#22C55E,#a855f7)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🧠</div>
+          <div>
+            <div style={{fontSize:22,fontWeight:800,color:C.text}}>{L.title}</div>
+            {analysis&&<div style={{fontSize:13,color:C.muted}}>{analysis.count} {L.tradesUsed} · {analysis.date}</div>}
+          </div>
+        </div>
+        {tradesWithPsych.length>=3&&(
+          <button onClick={analyze} disabled={loading} style={{background:loading?"#1E293B":"linear-gradient(135deg,#22C55E,#a855f7)",color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:16,fontWeight:700,cursor:loading?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:8,opacity:loading?0.7:1}}>
+            {loading?<><span style={{animation:"spin 1s linear infinite",display:"inline-block"}}>⟳</span> {L.loading}</>:<>{analysis?"🔄 "+L.refresh:"✨ "+L.btn}</>}
+          </button>
+        )}
+      </div>
+      {tradesWithPsych.length<3&&(
+        <div style={{padding:"24px 0",textAlign:"center",color:C.muted,fontSize:15}}>
+          <div style={{fontSize:36,marginBottom:10}}>📝</div>
+          <div>{L.noData}</div>
+          <div style={{fontSize:13,marginTop:8,opacity:0.6}}>({tradesWithPsych.length}/3)</div>
+        </div>
+      )}
+      {error&&<div style={{color:"#ef4444",fontSize:14,padding:"10px 14px",background:"#ef444410",borderRadius:10,marginBottom:12}}>{error}</div>}
+      {analysis&&!loading&&(
+        <div style={{background:C.panel,borderRadius:12,padding:"18px 20px",border:`1px solid ${C.accent}20`}}>
+          {analysis.text.split("\n").filter(p=>p.trim()).map((p,i)=>(
+            <p key={i} style={{margin:"0 0 14px 0",fontSize:16,lineHeight:1.8,color:C.text,opacity:0.95}}>{p}</p>
+          ))}
+        </div>
+      )}
+      {loading&&(
+        <div style={{background:C.panel,borderRadius:12,padding:"18px 20px"}}>
+          {[100,82,94,76].map((w,i)=>(
+            <div key={i} style={{height:14,background:C.border,borderRadius:4,marginBottom:12,width:w+"%",animation:"pulse 1.5s ease-in-out infinite",animationDelay:`${i*0.15}s`}}/>
+          ))}
+        </div>
+      )}
+      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style>
+    </div>
+  );
+}
+
+function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername}){
+  const labels = {
+    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança",
+      name:"Nome de exibição", email:"Email", newEmail:"Novo email",
+      emailInfo:"Um link de confirmação será enviado para o novo email.",
+      emailSent:"✅ Link de confirmação enviado! Verifique sua caixa de entrada.",
+      changePwd:"Alterar senha", currentPwd:"Senha atual", newPwd:"Nova senha", confirmPwd:"Confirmar nova senha",
+      save:"Salvar alterações", saveEmail:"Enviar confirmação", logout:"Sair da conta",
+      success:"Alterações salvas!", reauthMsg:"Por segurança, confirme sua senha atual antes de continuar.",
+      pwdMismatch:"As senhas não coincidem.", pwdShort:"Mínimo 6 caracteres.",
+      photoLabel:"Foto de perfil", changePhoto:"Alterar foto", uploading:"Enviando...",
+      close:"Fechar" },
+    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad",
+      name:"Nombre visible", email:"Email actual", newEmail:"Nuevo email",
+      emailInfo:"Se enviará un enlace de confirmación al nuevo email.",
+      emailSent:"✅ ¡Enlace enviado! Revisa tu bandeja de entrada.",
+      changePwd:"Cambiar contraseña", currentPwd:"Contraseña actual", newPwd:"Nueva contraseña", confirmPwd:"Confirmar contraseña",
+      save:"Guardar cambios", saveEmail:"Enviar confirmación", logout:"Cerrar sesión",
+      success:"¡Cambios guardados!", reauthMsg:"Por seguridad, confirma tu contraseña actual antes de continuar.",
+      pwdMismatch:"Las contraseñas no coinciden.", pwdShort:"Mínimo 6 caracteres.",
+      photoLabel:"Foto de perfil", changePhoto:"Cambiar foto", uploading:"Subiendo...",
+      close:"Cerrar" },
+    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security",
+      name:"Display name", email:"Current email", newEmail:"New email",
+      emailInfo:"A confirmation link will be sent to the new email.",
+      emailSent:"✅ Confirmation link sent! Check your inbox.",
+      changePwd:"Change password", currentPwd:"Current password", newPwd:"New password", confirmPwd:"Confirm new password",
+      save:"Save changes", saveEmail:"Send confirmation", logout:"Sign out",
+      success:"Changes saved!", reauthMsg:"For security, confirm your current password before continuing.",
+      pwdMismatch:"Passwords do not match.", pwdShort:"Minimum 6 characters.",
+      photoLabel:"Profile photo", changePhoto:"Change photo", uploading:"Uploading...",
+      close:"Close" },
+  };
+  const L = labels[lang]||labels.en;
+
+  const [tab, setTab]             = React.useState("profile");
+  const [displayName, setDisplayName] = React.useState(currentUser?.displayName||"");
+  const [newEmail, setNewEmail]   = React.useState("");
+  const [currentPwd, setCurrentPwd] = React.useState("");
+  const [newPwd, setNewPwd]       = React.useState("");
+  const [confirmPwd, setConfirmPwd] = React.useState("");
+  const [loading, setLoading]     = React.useState(false);
+  const [photoUploading, setPhotoUploading] = React.useState(false);
+  const [photoURL, setPhotoURL]   = React.useState(userPhotoURL||null);
+  const [msg, setMsg]             = React.useState(null);
+  const [showCurr, setShowCurr]   = React.useState(false);
+  const [showNew, setShowNew]     = React.useState(false);
+  const [localUsername, setLocalUsername] = React.useState(userUsername||"");
+  const fileRef = React.useRef(null);
+
+  // Generate username for pre-existing accounts that don't have one yet
+  React.useEffect(()=>{
+    if(localUsername) return;
+    if(!currentUser) return;
+    async function ensureUsername(){
+      try{
+        // Read directly from user's own profile (always permitted)
+        const profileSnap = await window.fsGetDocs(
+          window.fsCollection(window.db, `users/${currentUser.uid}/settings`)
+        );
+        let existingUsername = null;
+        profileSnap.forEach(d=>{ if(d.id==="profile" && d.data().username) existingUsername = d.data().username; });
+        if(existingUsername){ setLocalUsername(existingUsername); return; }
+
+        // Generate new username — format: firstname_xxxxx (5 random a-z0-9)
+        const base = (currentUser.displayName||currentUser.email||"trader")
+          .split(/[\s@]/)[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)||"trader";
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        let suffix = "";
+        for(let j=0;j<5;j++) suffix += chars[Math.floor(Math.random()*chars.length)];
+        const username = `${base}_${suffix}`;
+
+        // Save to user's own profile first (always works)
+        await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser.uid}/settings`,"profile"),
+          {username},{merge:true});
+
+        // Try to save to global usernames collection (may fail if rules not set — that's ok)
+        try{
+          await window.fsSetDoc(window.fsDoc(window.db,"usernames",username),{
+            username, email:currentUser.email, uid:currentUser.uid, createdAt:Date.now()
+          });
+        }catch(e){ /* Firestore rules may not allow this yet — username still works for display */ }
+
+        setLocalUsername(username);
+      }catch(e){ console.error("Username gen error:",e); }
+    }
+    ensureUsername();
+  },[currentUser?.uid]);
+
+  async function reauth(password){
+    const cred = window.fbEmailAuthProvider.credential(currentUser.email, password);
+    await window.fbReauth(currentUser, cred);
+  }
+
+  async function uploadPhoto(file){
+    if(!file) return;
+    const validTypes = ["image/jpeg","image/png","image/webp","image/gif"];
+    if(!validTypes.includes(file.type)){ setMsg({type:"error",text:"Use JPG, PNG, WEBP ou GIF."}); return; }
+    if(file.size > 5*1024*1024){ setMsg({type:"error",text:"Imagem muito grande. Máximo 5MB."}); return; }
+    setPhotoUploading(true); setMsg(null);
+    try{
+      // Resize + compress via canvas (max 256px, JPEG 80%)
+      const dataUrl = await new Promise((res,rej)=>{
+        const reader = new FileReader();
+        reader.onerror = rej;
+        reader.onload = ev => {
+          const img = new Image();
+          img.onerror = rej;
+          img.onload = ()=>{
+            const MAX = 256;
+            const scale = Math.min(MAX/img.width, MAX/img.height, 1);
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+            res(canvas.toDataURL("image/jpeg", 0.80));
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+      // Save ONLY to Firestore — Firebase Auth photoURL has a size limit so we skip it
+      await window.fsSetDoc(
+        window.fsDoc(window.db, `users/${currentUser.uid}/settings`, "profile"),
+        { photoURL: dataUrl },
+        { merge: true }
+      );
+      setPhotoURL(dataUrl);
+      onPhotoChange(dataUrl);
+      setMsg({type:"success", text:L.success});
+    }catch(e){
+      console.error("Photo error:", e);
+      setMsg({type:"error", text:"Erro: " + (e?.message || "tente novamente.")});
+    }
+    setPhotoUploading(false);
+  }
+
+  async function saveProfile(){
+    setLoading(true); setMsg(null);
+    try{
+      await window.fbUpdateProfile(currentUser, {displayName: displayName.trim()||null});
+      // Also save to Firestore so it syncs across all devices
+      await window.fsSetDoc(
+        window.fsDoc(window.db, `users/${currentUser.uid}/settings`, "profile"),
+        { displayName: displayName.trim()||null },
+        { merge: true }
+      );
+      setMsg({type:"success", text:L.success});
+    }catch(e){ setMsg({type:"error", text:e.message}); }
+    setLoading(false);
+  }
+
+  async function saveEmail(){
+    if(!newEmail.trim()){ return; }
+    setLoading(true); setMsg(null);
+    try{
+      await reauth(currentPwd);
+      await window.fbVerifyBeforeUpdateEmail(currentUser, newEmail.trim());
+      setMsg({type:"success", text:L.emailSent});
+      setNewEmail(""); setCurrentPwd("");
+    }catch(e){
+      const msgs={"auth/wrong-password":"Senha atual incorreta.","auth/invalid-credential":"Senha atual incorreta.","auth/invalid-email":"Email inválido."};
+      setMsg({type:"error", text:msgs[e.code]||e.message});
+    }
+    setLoading(false);
+  }
+
+  async function savePassword(){
+    setMsg(null);
+    if(newPwd!==confirmPwd){ setMsg({type:"error",text:L.pwdMismatch}); return; }
+    if(newPwd.length<6){ setMsg({type:"error",text:L.pwdShort}); return; }
+    setLoading(true);
+    try{
+      await reauth(currentPwd);
+      await window.fbUpdatePassword(currentUser, newPwd);
+      setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
+      setMsg({type:"success", text:L.success});
+    }catch(e){
+      const msgs={"auth/wrong-password":"Senha atual incorreta.","auth/invalid-credential":"Senha atual incorreta."};
+      setMsg({type:"error", text:msgs[e.code]||e.message});
+    }
+    setLoading(false);
+  }
+
+  const iS={width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,padding:"14px 18px",fontSize:16,outline:"none",fontFamily:"\'Barlow Condensed\',sans-serif",boxSizing:"border-box"};
+  const labelS={fontSize:12,color:C.muted,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",display:"block",marginBottom:7};
+
+  return(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,width:"100%",maxWidth:600,maxHeight:"94vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",fontFamily:"inherit"}} onClick={e=>e.stopPropagation()}>
+
+        {/* ── HEADER ── */}
+        <div style={{padding:"32px 36px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:16}}>
+            {/* Avatar with upload */}
+            <div style={{position:"relative",cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
+              {photoURL
+                ? <img src={photoURL} style={{width:68,height:68,borderRadius:"50%",objectFit:"cover",border:"2px solid #22C55E"}}/>
+                : <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:"#fff",border:"2px solid #22C55E"}}>
+                    {currentUser?.displayName?.[0]?.toUpperCase()||currentUser?.email?.[0]?.toUpperCase()||"U"}
+                  </div>
+              }
+              <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,borderRadius:"50%",background:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,border:`2px solid ${C.card}`}}>
+                {photoUploading ? "⟳" : "📷"}
+              </div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>uploadPhoto(e.target.files?.[0])}/>
+            <div>
+              <div style={{fontSize:26,fontWeight:800,color:C.text}}>{L.title}</div>
+              <div style={{fontSize:15,color:C.muted,marginTop:3}}>{currentUser?.displayName||currentUser?.email}</div>
+              <div style={{fontSize:11,color:"#22C55E",marginTop:2,cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
+                {photoUploading ? L.uploading : L.changePhoto}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:22,lineHeight:1,padding:4,alignSelf:"flex-start"}}>✕</button>
+        </div>
+
+        {/* ── TABS ── */}
+        <div style={{display:"flex",gap:6,padding:"24px 36px 0"}}>
+          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab]].map(([t,l])=>(
+            <button key={t} onClick={()=>{setTab(t);setMsg(null);setCurrentPwd("");}} style={{padding:"9px 20px",borderRadius:10,border:"none",background:tab===t?"linear-gradient(135deg,#22C55E,#3b82f6)":"transparent",color:tab===t?"#fff":C.muted,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        <div style={{padding:"24px 36px 36px",display:"flex",flexDirection:"column",gap:18}}>
+
+          {msg&&(
+            <div style={{padding:"11px 16px",borderRadius:10,background:msg.type==="success"?"#22c55e15":"#ef444415",border:`1px solid ${msg.type==="success"?"#22c55e40":"#ef444440"}`,color:msg.type==="success"?"#22c55e":"#ef4444",fontSize:14,fontWeight:600,lineHeight:1.5}}>
+              {msg.text}
+            </div>
+          )}
+
+          {/* ── PROFILE TAB ── */}
+          {tab==="profile"&&(<>
+            {localUsername&&(
+              <div style={{background:`${C.panel}`,border:`2px solid #22C55E40`,borderRadius:12,padding:"14px 18px"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#22C55E",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>👤 Your Username</div>
+                <div style={{fontSize:22,fontWeight:900,color:C.text,fontFamily:"monospace",letterSpacing:"0.05em"}}>{localUsername}</div>
+                <div style={{fontSize:12,color:C.muted,marginTop:4}}>Use this to recover your password if you ever forget it.</div>
+              </div>
+            )}
+            {!localUsername&&(
+              <div style={{background:C.panel,borderRadius:12,padding:"14px 18px",border:`1px solid ${C.border}`,fontSize:13,color:C.muted}}>
+                ⏳ Generating your username...
+              </div>
+            )}
+            <div>
+              <label style={labelS}>{L.name}</label>
+              <input value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder={currentUser?.email?.split("@")[0]||"Your name"} style={iS} onKeyDown={e=>e.key==="Enter"&&saveProfile()}/>
+            </div>
+            <div>
+              <label style={labelS}>{L.email}</label>
+              <input value={currentUser?.email||""} disabled style={{...iS,opacity:0.45,cursor:"not-allowed"}}/>
+            </div>
+            <button onClick={saveProfile} disabled={loading} style={{background:loading?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontFamily:"inherit",fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:16,opacity:loading?0.7:1}}>
+              {loading?"⏳...":L.save}
+            </button>
+          </>)}
+
+          {/* ── SECURITY TAB ── */}
+          {tab==="security"&&(<>
+            {/* Change email section */}
+            <div style={{background:C.panel,borderRadius:14,padding:"16px 18px",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:12}}>📧 {L.newEmail}</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div>
+                  <label style={labelS}>{L.newEmail}</label>
+                  <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="novo@email.com" style={iS}/>
+                </div>
+                <div>
+                  <label style={labelS}>{L.currentPwd}</label>
+                  <div style={{position:"relative"}}>
+                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}/>
+                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showCurr?"🙈":"👁️"}</button>
+                  </div>
+                </div>
+                <div style={{fontSize:12,color:C.muted,opacity:0.8}}>ℹ️ {L.emailInfo}</div>
+                <button onClick={saveEmail} disabled={loading||!newEmail||!currentPwd} style={{background:loading||!newEmail||!currentPwd?"#1E293B":"linear-gradient(135deg,#3b82f6,#22C55E)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:loading||!newEmail||!currentPwd?"not-allowed":"pointer",fontSize:15,opacity:loading||!newEmail||!currentPwd?0.5:1}}>
+                  {loading?"⏳...":L.saveEmail}
+                </button>
+              </div>
+            </div>
+
+            {/* Change password section */}
+            <div style={{background:C.panel,borderRadius:14,padding:"16px 18px",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:12}}>🔑 {L.changePwd}</div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <div>
+                  <label style={labelS}>{L.currentPwd}</label>
+                  <div style={{position:"relative"}}>
+                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}/>
+                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showCurr?"🙈":"👁️"}</button>
+                  </div>
+                </div>
+                <div>
+                  <label style={labelS}>{L.newPwd}</label>
+                  <div style={{position:"relative"}}>
+                    <input type={showNew?"text":"password"} value={newPwd} onChange={e=>setNewPwd(e.target.value)} style={iS}/>
+                    <button onClick={()=>setShowNew(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showNew?"🙈":"👁️"}</button>
+                  </div>
+                </div>
+                <div>
+                  <label style={labelS}>{L.confirmPwd}</label>
+                  <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)} style={{...iS,borderColor:confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border}}/>
+                </div>
+                <button onClick={savePassword} disabled={loading||!currentPwd||!newPwd||!confirmPwd} style={{background:loading||!currentPwd||!newPwd||!confirmPwd?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:loading||!currentPwd||!newPwd||!confirmPwd?"not-allowed":"pointer",fontSize:15,opacity:loading||!currentPwd||!newPwd||!confirmPwd?0.5:1}}>
+                  {loading?"⏳...":L.save}
+                </button>
+              </div>
+            </div>
+          </>)}
+
+          {/* Sign out */}
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+            <button onClick={onLogout} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:12,padding:"12px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"border-color 0.2s"}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor="#ef4444"}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}
+            >
+              ⏻ {L.logout}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+class ErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state={hasError:false,error:null}; }
+  static getDerivedStateFromError(e){ return {hasError:true,error:e}; }
+  componentDidCatch(e,info){ console.error("React error:",e,info); }
+  render(){
+    if(this.state.hasError){
+      return (
+        <div style={{minHeight:"100vh",background:"#0f1117",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,fontFamily:"'Barlow Condensed',sans-serif",color:"#fff",padding:20}}>
+          <div style={{fontSize:48}}>⚠️</div>
+          <div style={{fontSize:24,fontWeight:800}}>Something went wrong</div>
+          <div style={{fontSize:14,color:"#475569",maxWidth:400,textAlign:"center"}}>{this.state.error?.message||"Unknown error"}</div>
+          <button onClick={()=>window.location.reload()} style={{marginTop:8,background:"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"12px 28px",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>
+            🔄 Reload App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
+function App(){
+  const [loggedIn,setLoggedIn]=useState(false);
+  const [currentUser,setCurrentUser]=useState(null);
+  const [dbReady,setDbReady]=useState(!!window.firebaseReady);
+  const [loading,setLoading]=useState(false);
+
+  const [trades,setTrades]=useState([]);
+  const [strategies,setStrategies]=useState(["Breakout","Pullback","Reversal"]);
+  const [symbolsList,setSymbolsList]=useState(["NQ","ES"]);
+
+  const [newStrategyInput,setNewStrategyInput]=useState("");
+  const [showNewStrategy,setShowNewStrategy]=useState(false);
+  const [showManage,setShowManage]=useState(false);
+  const [showAccount,setShowAccount]=useState(false);
+  const [userPhotoURL,setUserPhotoURL]=useState(null);
+  const [userUsername,setUserUsername]=useState("");
+  const [newSymbolInput,setNewSymbolInput]=useState("");
+  const [tab,setTab]=useState("dashboard");
+  const [theme,setTheme]=useState(()=>localStorage.getItem("tj_theme")||"dark");
+  const [lang,setLang]=useState(()=>localStorage.getItem("tj_lang")||"en");
+  const [showLangMenu,setShowLangMenu]=useState(false);
+  const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  // Apply theme globally
+  const C = theme==="dark" ? DARK : LIGHT;
+  const TRANSLATIONS = {
+    pt: {
+      dashboard:"Dashboard", trades:"Trades", analysis:"Análise", calendar:"Calendário", news:"Calendário Econômico",
+      manage:"Gerenciar", addTrade:"+ Adicionar", logout:"Sair",
+      totalPnl:"P&L Total", winRate:"Taxa de Acerto", profitFactor:"Fator de Lucro", maxDrawdown:"Drawdown Máx.",
+      avgWin:"Média Vitória", avgLoss:"Média Derrota", discipline:"Disciplina", bestStrategy:"Melhor Estratégia",
+      disciplineScore:"Score de Disciplina", avgRating:"Avaliação Média",
+      discPlan:"Plano Seguido", discStop:"Stop Respeitado", discRating:"Avaliação", filterRating:"Avaliação (estrelas)",
+      equityCurve:"Curva de Capital", pnlByDay:"P&L por Dia", psychResult:"Psicologia × Resultado",
+      noData:"Sem dados ainda", trades0:"0 trades", winLoss:"V / D",
+      grossProfit:"lucro bruto / prejuízo bruto", peakTrough:"pico ao vale",
+      perWin:"por trade vencedor", perLoss:"por trade perdedor", stratFollowed:"estratégia seguida",
+      byTotalPnl:"por P&L total",
+      thisTrade:"Este trade", cumTotal:"Total acumulado", dailyPnl:"P&L do dia",
+      tradeCount:(n)=>`${n} trade${n!==1?'s':''}`,
+      // Trade form
+      newTrade:"Novo Trade", editTrade:"Editar Trade", saveTrade:"Salvar Trade", saving:"Salvando...",
+      secIdentification:"Identificação", secExecution:"Execução", secPriceLevels:"Níveis de Preço",
+      secPartials:"Parciais", secFinalTarget:"Alvo Final & Resultado", secReview:"Avaliação & Psicologia",
+      secChart:"Gráfico do Trade",
+      fTradeN:"Trade N°", fDate:"Data", fSymbol:"Símbolo", fSelectSymbol:"— Selecionar símbolo —",
+      fDirection:"Direção", fContracts:"Contratos", fEntryHour:"Hora de Entrada", fExitHour:"Hora de Saída",
+      fStrategy:"Estratégia", fSelectStrategy:"— Selecionar estratégia —", fCreateStrategy:"＋ Criar nova estratégia…",
+      fStrategyName:"Nome da estratégia...",
+      fGammaLevels:"Nível(is) Gamma",
+      fEntryPrice:"Preço de Entrada", fTargetPrice:"Preço Alvo", fStopPrice:"Preço Stop",
+      fPartialType:"Tipo de Parcial",
+      fP1Price:"Preço 1ª Parcial", fP1Contracts:"Contratos 1ª Parcial", fP1Hit:"1ª Parcial Atingida",
+      fP2Price:"Preço 2ª Parcial", fP2Contracts:"Contratos 2ª Parcial", fP2Hit:"2ª Parcial Atingida",
+      fFinalTargetPrice:"Preço Alvo Final", fFinalTargetHit:"Alvo Final Atingido",
+      fActualFinalLevel:"Nível Final Real", fProfitTarget:"Meta de Lucro ($)", fActualPnl:"PnL Real ($)",
+      fStrategyFollowed:"Estratégia Seguida", fStopRespected:"Stop Respeitado", fPsychology:"Como você estava se sentindo?",
+      fPsychPlaceholder:"Descreva seu estado emocional, mentalidade, nível de confiança...",
+      fTradeRating:"Avaliação do Trade", fTradeRatingHint:"Como você avalia a execução deste trade?",
+      fComments:"Comentários",
+      fDropChart:"Solte o gráfico ou", fClickUpload:"clique para enviar",
+      fRemove:"✕ Remover",
+      // Manage modal
+      manageLists:"Gerenciar Listas", mSymbols:"Símbolos", mStrategies:"Estratégias",
+      mSymbolPlaceholder:"ex: NQ, EURUSD, BTC...", mStrategyPlaceholder:"Nome da estratégia...",
+      mClose:"FECHAR", mAdd:"ADD",
+      // Delete modals
+      deleteTrade:"Excluir Trade", deleteCannotUndo:"Esta ação não pode ser desfeita.",
+      deleteConfirm:"CONFIRMAR EXCLUSÃO", deleteCancel:"CANCELAR",
+      // Calendar
+      calMonths:["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"],
+      calDays:["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"],
+      calWin:"V", calLoss:"D", filterAll:"Todos",
+      // News
+      newsTitle:"Calendário Econômico", newsRealtime:"Tempo Real · USD", newsOpenFull:"Abrir completo",
+      // Table headers
+      thNum:"#", thDate:"Data", thSymbol:"Símbolo", thDir:"Dir.", thLots:"Lotes",
+      thEntry:"Entrada", thExit:"Saída", thStrategy:"Estratégia", thGamma:"Gamma",
+      thEntryD:"Entrada$", thTargetD:"Alvo$", thStopD:"Stop$",
+      thActualPnl:"PnL Real", thPsych:"Psico", thStrat:"Estr?",
+      // Analysis
+      perfByStrategy:"Desempenho por Estratégia", resultDist:"Distribuição de Resultados",
+      gammaUsage:"Uso de Nível Gamma", noGammaData:"Nenhum dado de gamma ainda",
+      statSummary:"Resumo Estatístico",
+      expectancy:"Expectativa / Trade", stratDiscipline:"Disciplina de Estratégia",
+      bestTrade:"Melhor Trade", worstTrade:"Pior Trade",
+    },
+    es: {
+      dashboard:"Dashboard", trades:"Trades", analysis:"Análisis", calendar:"Calendario", news:"Calendario Económico",
+      manage:"Gestionar", addTrade:"+ Añadir", logout:"Salir",
+      totalPnl:"P&L Total", winRate:"Tasa de Acierto", profitFactor:"Factor de Beneficio", maxDrawdown:"Drawdown Máx.",
+      avgWin:"Media Ganancia", avgLoss:"Media Pérdida", discipline:"Disciplina", bestStrategy:"Mejor Estrategia",
+      disciplineScore:"Score de Disciplina", avgRating:"Evaluación Media",
+      discPlan:"Plan Seguido", discStop:"Stop Respetado", discRating:"Evaluación", filterRating:"Evaluación (estrellas)",
+      equityCurve:"Curva de Capital", pnlByDay:"P&L por Día", psychResult:"Psicología × Resultado",
+      noData:"Sin datos aún", trades0:"0 operaciones", winLoss:"G / P",
+      grossProfit:"beneficio bruto / pérdida bruta", peakTrough:"pico al valle",
+      perWin:"por operación ganadora", perLoss:"por operación perdedora", stratFollowed:"estrategia seguida",
+      byTotalPnl:"por P&L total",
+      thisTrade:"Esta operación", cumTotal:"Total acumulado", dailyPnl:"P&L del día",
+      tradeCount:(n)=>`${n} operaci${n!==1?'ones':'ón'}`,
+      // Trade form
+      newTrade:"Nueva Operación", editTrade:"Editar Operación", saveTrade:"Guardar Operación", saving:"Guardando...",
+      secIdentification:"Identificación", secExecution:"Ejecución", secPriceLevels:"Niveles de Precio",
+      secPartials:"Parciales", secFinalTarget:"Objetivo Final & Resultado", secReview:"Evaluación & Psicología",
+      secChart:"Gráfico de la Operación",
+      fTradeN:"Operación N°", fDate:"Fecha", fSymbol:"Símbolo", fSelectSymbol:"— Seleccionar símbolo —",
+      fDirection:"Dirección", fContracts:"Contratos", fEntryHour:"Hora de Entrada", fExitHour:"Hora de Salida",
+      fStrategy:"Estrategia", fSelectStrategy:"— Seleccionar estrategia —", fCreateStrategy:"＋ Crear nueva estrategia…",
+      fStrategyName:"Nombre de la estrategia...",
+      fGammaLevels:"Nivel(es) Gamma",
+      fEntryPrice:"Precio de Entrada", fTargetPrice:"Precio Objetivo", fStopPrice:"Precio Stop",
+      fPartialType:"Tipo de Parcial",
+      fP1Price:"Precio 1ª Parcial", fP1Contracts:"Contratos 1ª Parcial", fP1Hit:"1ª Parcial Alcanzada",
+      fP2Price:"Precio 2ª Parcial", fP2Contracts:"Contratos 2ª Parcial", fP2Hit:"2ª Parcial Alcanzada",
+      fFinalTargetPrice:"Precio Objetivo Final", fFinalTargetHit:"Objetivo Final Alcanzado",
+      fActualFinalLevel:"Nivel Final Real", fProfitTarget:"Meta de Ganancia ($)", fActualPnl:"PnL Real ($)",
+      fStrategyFollowed:"Estrategia Seguida", fStopRespected:"Stop Respetado", fPsychology:"¿Cómo te sentías?",
+      fPsychPlaceholder:"Describe tu estado emocional, mentalidad, nivel de confianza...",
+      fTradeRating:"Evaluación del Trade", fTradeRatingHint:"¿Cómo evalúas la ejecución de esta operación?",
+      fComments:"Comentarios",
+      fDropChart:"Suelta el gráfico o", fClickUpload:"haz clic para subir",
+      fRemove:"✕ Quitar",
+      // Manage modal
+      manageLists:"Gestionar Listas", mSymbols:"Símbolos", mStrategies:"Estrategias",
+      mSymbolPlaceholder:"ej: NQ, EURUSD, BTC...", mStrategyPlaceholder:"Nombre de la estrategia...",
+      mClose:"CERRAR", mAdd:"ADD",
+      // Delete modals
+      deleteTrade:"Eliminar Operación", deleteCannotUndo:"Esta acción no se puede deshacer.",
+      deleteConfirm:"CONFIRMAR ELIMINACIÓN", deleteCancel:"CANCELAR",
+      // Calendar
+      calMonths:["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"],
+      calDays:["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"],
+      calWin:"G", calLoss:"P", filterAll:"Todos",
+      // News
+      newsTitle:"Calendario Económico", newsRealtime:"Tiempo Real · USD", newsOpenFull:"Abrir completo",
+      // Table headers
+      thNum:"#", thDate:"Fecha", thSymbol:"Símbolo", thDir:"Dir.", thLots:"Lotes",
+      thEntry:"Entrada", thExit:"Salida", thStrategy:"Estrategia", thGamma:"Gamma",
+      thEntryD:"Entrada$", thTargetD:"Objetivo$", thStopD:"Stop$",
+      thActualPnl:"PnL Real", thPsych:"Psico", thStrat:"¿Estr?",
+      // Analysis
+      perfByStrategy:"Rendimiento por Estrategia", resultDist:"Distribución de Resultados",
+      gammaUsage:"Uso de Nivel Gamma", noGammaData:"Aún no hay datos de gamma",
+      statSummary:"Resumen Estadístico",
+      expectancy:"Expectativa / Operación", stratDiscipline:"Disciplina de Estrategia",
+      bestTrade:"Mejor Operación", worstTrade:"Peor Operación",
+    },
+    en: {
+      dashboard:"Dashboard", trades:"Trades", analysis:"Analysis", calendar:"Calendar", news:"Economic Calendar",
+      manage:"Manage", addTrade:"+ Add Trade", logout:"Logout",
+      totalPnl:"Total P&L", winRate:"Win Rate", profitFactor:"Profit Factor", maxDrawdown:"Max Drawdown",
+      avgWin:"Avg Win", avgLoss:"Avg Loss", discipline:"Discipline", bestStrategy:"Best Strategy",
+      disciplineScore:"Discipline Score", avgRating:"Avg Rating",
+      discPlan:"Plan Followed", discStop:"Stop Respected", discRating:"Rating", filterRating:"Rating (stars)",
+      equityCurve:"Equity Curve", pnlByDay:"P&L by Day", psychResult:"Psychology × Result",
+      noData:"No data yet", trades0:"0 trades", winLoss:"W / L",
+      grossProfit:"gross profit / gross loss", peakTrough:"peak to trough",
+      perWin:"per winning trade", perLoss:"per losing trade", stratFollowed:"strategy followed",
+      byTotalPnl:"by total P&L",
+      thisTrade:"This trade", cumTotal:"Cumulative total", dailyPnl:"Daily P&L",
+      tradeCount:(n)=>`${n} trade${n!==1?'s':''}`,
+      // Trade form
+      newTrade:"New Trade", editTrade:"Edit Trade", saveTrade:"Save Trade", saving:"Saving...",
+      secIdentification:"Identification", secExecution:"Execution", secPriceLevels:"Price Levels",
+      secPartials:"Partials", secFinalTarget:"Final Target & Result", secReview:"Review & Psychology",
+      secChart:"Trade Chart",
+      fTradeN:"Trade N°", fDate:"Date", fSymbol:"Symbol", fSelectSymbol:"— Select symbol —",
+      fDirection:"Direction", fContracts:"Contracts", fEntryHour:"Entry Hour", fExitHour:"Exit Hour",
+      fStrategy:"Strategy", fSelectStrategy:"— Select strategy —", fCreateStrategy:"＋ Create new strategy…",
+      fStrategyName:"Strategy name...",
+      fGammaLevels:"Gamma Level(s)",
+      fEntryPrice:"Entry Price", fTargetPrice:"Target Price", fStopPrice:"Stop Price",
+      fPartialType:"Partial Type",
+      fP1Price:"1st Partial Price", fP1Contracts:"1st Partial Contracts", fP1Hit:"1st Partial Hit",
+      fP2Price:"2nd Partial Price", fP2Contracts:"2nd Partial Contracts", fP2Hit:"2nd Partial Hit",
+      fFinalTargetPrice:"Final Target Price", fFinalTargetHit:"Final Target Hit",
+      fActualFinalLevel:"Actual Final Level", fProfitTarget:"Profit Target ($)", fActualPnl:"Actual PnL ($)",
+      fStrategyFollowed:"Strategy Followed", fStopRespected:"Stop Respected", fPsychology:"How were you feeling?",
+      fPsychPlaceholder:"Describe your emotional state, mindset, confidence level...",
+      fTradeRating:"Trade Rating", fTradeRatingHint:"How do you rate the execution of this trade?",
+      fComments:"Comments",
+      fDropChart:"Drop chart or", fClickUpload:"click to upload",
+      fRemove:"✕ Remove",
+      // Manage modal
+      manageLists:"Manage Lists", mSymbols:"Symbols", mStrategies:"Strategies",
+      mSymbolPlaceholder:"e.g. NQ, EURUSD, BTC...", mStrategyPlaceholder:"Strategy name...",
+      mClose:"CLOSE", mAdd:"ADD",
+      // Delete modals
+      deleteTrade:"Delete Trade", deleteCannotUndo:"This action cannot be undone.",
+      deleteConfirm:"CONFIRM DELETE", deleteCancel:"CANCEL",
+      // Calendar
+      calMonths:["January","February","March","April","May","June","July","August","September","October","November","December"],
+      calDays:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+      calWin:"W", calLoss:"L", filterAll:"All",
+      // News
+      newsTitle:"Economic Calendar", newsRealtime:"Real-time · USD", newsOpenFull:"Open full",
+      // Table headers
+      thNum:"#", thDate:"Date", thSymbol:"Symbol", thDir:"Dir.", thLots:"Lots",
+      thEntry:"Entry", thExit:"Exit", thStrategy:"Strategy", thGamma:"Gamma",
+      thEntryD:"Entry$", thTargetD:"Target$", thStopD:"Stop$",
+      thActualPnl:"Actual PnL", thPsych:"Psych", thStrat:"Strat?",
+      // Analysis
+      perfByStrategy:"Performance by Strategy", resultDist:"Result Distribution",
+      gammaUsage:"Gamma Level Usage", noGammaData:"No gamma level data yet",
+      statSummary:"Statistical Summary",
+      expectancy:"Expectancy / Trade", stratDiscipline:"Strategy Discipline",
+      bestTrade:"Best Trade", worstTrade:"Worst Trade",
+    },
+  };
+  const T = TRANSLATIONS[lang] || TRANSLATIONS["en"];
+  const iS = {...iS_base, background:C.panel, border:`1px solid ${C.borderHi}`, color:C.text};
+  const lS = {fontSize:15, color:C.sub, marginBottom:6, display:"block", fontWeight:500};
+  // Wrapper local que fecha sobre lS para não precisar passar como prop em cada Field
+  const FField = ({label,span,children}) => <Field label={label} span={span} lS={lS}>{children}</Field>;
+  const [showForm,setShowForm]=useState(false);
+  const [editTrade,setEditTrade]=useState(null);
+  const [filterSymbol,setFilterSymbol]=useState("All");
+  const [filterStrategy,setFilterStrategy]=useState("All");
+  const [sortField,setSortField]=useState("date");
+  const [sortDir,setSortDir]=useState("desc");
+  const [showAdvFilter,setShowAdvFilter]=useState(false);
+  const [advFilters,setAdvFilters]=useState({
+    dateFrom:"", dateTo:"",
+    strategyFollowed:"All",
+    hasPartial1:false, hasPartial2:false,
+    onlyWins:false, onlyLosses:false,
+    gammaLevels:[], direction:"All",
+    strategies:[], minRating:0,
+  });
+  const [form,setForm]=useState({...EMPTY_FORM});
+  const [expandedRow,setExpandedRow]=useState(null);
+  const [confirmDelete,setConfirmDelete]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [selectedTrades,setSelectedTrades]=useState(new Set());
+  const [confirmBulkDelete,setConfirmBulkDelete]=useState(false);
+
+  function toggleSelect(id,e){e.stopPropagation();setSelectedTrades(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});}
+  function toggleSelectAll(){setSelectedTrades(s=>s.size===filtered.length?new Set():new Set(filtered.map(t=>t._docId)));}
+  async function bulkDelete(){
+    for(const id of selectedTrades){
+      try{ await window.fsDeleteDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/trades`,id)); }catch(e){}
+    }
+    setTrades(ts=>ts.filter(t=>!selectedTrades.has(t._docId)));
+    setSelectedTrades(new Set());
+    setConfirmBulkDelete(false);
+  }
+
+  function login(user){setCurrentUser(user);setLoggedIn(true);}
+  async function logout(){await window.fbSignOut(window.auth);setCurrentUser(null);setLoggedIn(false);setTrades([]);setUserPhotoURL(null);setUserUsername("");}
+
+  // Wait for Firebase
+  useEffect(()=>{
+    if(!showLangMenu) return;
+    const close=(e)=>{if(!e.target.closest('[data-langmenu]')) setShowLangMenu(false);};
+    document.addEventListener("mousedown",close);
+    return ()=>document.removeEventListener("mousedown",close);
+  },[showLangMenu]);
+
+  useEffect(()=>{
+    let unsub;
+    function setupAuth(){
+      unsub = window.fbOnAuthStateChanged(window.auth, user=>{
+        setDbReady(true);
+        if(user){ setCurrentUser(user); setLoggedIn(true); setUserPhotoURL(null); setUserUsername(""); }
+        else{ setCurrentUser(null); setLoggedIn(false); setTrades([]); setUserPhotoURL(null); setUserUsername(""); }
+      });
+    }
+    if(window.firebaseReady && window.fbOnAuthStateChanged){
+      setupAuth();
+    } else {
+      const poll = setInterval(()=>{
+        if(window.firebaseReady && window.fbOnAuthStateChanged){
+          clearInterval(poll);
+          setupAuth();
+        }
+      }, 50);
+    }
+    return ()=>{ if(unsub) unsub(); };
+  },[]);
+
+  // Load data from Firestore - triggered when currentUser is set
+  useEffect(()=>{
+    if(!currentUser||!dbReady) return;
+    // Clear previous user's data immediately before loading new user's
+    setTrades([]);
+    setStrategies(["Breakout","Pullback","Reversal"]);
+    setSymbolsList([]);
+    async function load(){
+      setLoading(true);
+      try{
+        // Load trades
+        const tradesSnap = await window.fsGetDocs(window.fsCollection(window.db,`users/${currentUser?.uid||"_"}/trades`));
+        const loadedTrades = tradesSnap.docs.map(d=>({...d.data(),_docId:d.id}));
+
+        // Migração: corrige gamma levels com nomes inválidos
+        const validSet = new Set(GAMMA_LEVELS);
+        const badNameMap = {
+          "Weekly Call Wall":"Call Resistance","ODTE Call Wall":"Call Resistance 0DTE",
+          "0DTE Call Wall":"Call Resistance 0DTE","Weekly Put Wall":"Put Support",
+          "ODTE Put Wall":"Put Support 0DTE","0DTE Put Wall":"Put Support 0DTE",
+          "Key Strike":"HVL","Daily Max":"1D Max","Daily Min":"1D Min",
+        };
+        for(const t of loadedTrades){
+          if(!Array.isArray(t.gammaLevels)) continue;
+          const fixed = t.gammaLevels.map(g=> validSet.has(g) ? g : (badNameMap[g]||null)).filter(Boolean);
+          const hasInvalid = t.gammaLevels.some(g=>!validSet.has(g));
+          if(hasInvalid && t._docId){
+            try{ await window.fsUpdateDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/trades`,t._docId),{gammaLevels:fixed}); }catch(e){}
+            t.gammaLevels = fixed;
+          }
+        }
+
+        setTrades(loadedTrades.sort((a,b)=>new Date(b.date)-new Date(a.date)));
+
+        // Load settings
+        const settingsSnap = await window.fsGetDocs(window.fsCollection(window.db,`users/${currentUser?.uid}/settings`));
+        settingsSnap.docs.forEach(d=>{
+          const data=d.data();
+          if(d.id==="strategies"&&data.list) setStrategies(data.list);
+          if(d.id==="symbols"&&data.list) setSymbolsList(data.list);
+          if(d.id==="profile"&&data.photoURL){
+            setUserPhotoURL(data.photoURL);
+          }
+          if(d.id==="profile"&&data.username){
+            setUserUsername(data.username);
+          }
+          if(d.id==="profile"&&data.displayName&&!currentUser.displayName){
+            window.fbUpdateProfile(currentUser, {displayName: data.displayName}).catch(()=>{});
+          }
+        });
+      }catch(e){console.error("Load error:",e);}
+      finally{ setLoading(false); }
+    }
+    load();
+  },[currentUser,dbReady]);
+
+  // Save strategies to Firestore
+  async function saveStrategies(list){
+    setStrategies(list);
+    try{await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/settings`,"strategies"),{list});}catch(e){}
+  }
+
+  // Save symbols to Firestore
+  async function saveSymbols(list){
+    setSymbolsList(list);
+    try{await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/settings`,"symbols"),{list});}catch(e){}
+  }
+
+  function addStrategy(){
+    const name=newStrategyInput.trim();
+    if(!name||strategies.includes(name)) return;
+    const newList=[...strategies,name];
+    saveStrategies(newList);
+    setF("strategy",name);
+    setNewStrategyInput("");
+    setShowNewStrategy(false);
+  }
+
+  function addSymbol(){
+    const name=newSymbolInput.trim().toUpperCase();
+    if(!name||symbolsList.includes(name)) return;
+    saveSymbols([...symbolsList,name]);
+    setNewSymbolInput("");
+  }
+
+  const symbols=useMemo(()=>["All",...new Set([...symbolsList,...trades.map(t=>t.symbol)].filter(Boolean))],[trades,symbolsList]);
+  const usedStrategies=useMemo(()=>["All",...strategies.filter(Boolean)],[strategies]);
+  const filtered=useMemo(()=>{
+    let r=trades.filter(t=>{
+      if(filterSymbol!=="All"&&t.symbol!==filterSymbol) return false;
+      if(filterStrategy!=="All"&&t.strategy!==filterStrategy) return false;
+      if(advFilters.dateFrom&&t.date<advFilters.dateFrom) return false;
+      if(advFilters.dateTo&&t.date>advFilters.dateTo) return false;
+      if(advFilters.strategyFollowed!=="All"&&t.strategyFollowed!==advFilters.strategyFollowed) return false;
+      if(advFilters.hasPartial1&&t.partialType!=="Partial 1"&&t.partialType!=="Both") return false;
+      if(advFilters.hasPartial2&&t.partialType!=="Both") return false;
+      if(advFilters.onlyWins&&t.actualPnl<=0) return false;
+      if(advFilters.onlyLosses&&t.actualPnl>=0) return false;
+      if(advFilters.gammaLevels.length>0){
+        const tg=Array.isArray(t.gammaLevels)?t.gammaLevels:(t.gammaLevel?[t.gammaLevel]:[]);
+        if(!advFilters.gammaLevels.some(g=>tg.includes(g))) return false;
+      }
+      if(advFilters.direction!=="All"&&t.direction!==advFilters.direction) return false;
+      if(advFilters.strategies.length>0&&!advFilters.strategies.includes(t.strategy)) return false;
+      if(advFilters.minRating>0&&(t.tradeRating||0)!==advFilters.minRating) return false;
+      return true;
+    });
+    r.sort((a,b)=>{
+      let va,vb;
+      if(sortField==="date"){va=a.date||"";vb=b.date||"";}
+      else if(sortField==="pnl"){va=parseFloat(a.actualPnl)||0;vb=parseFloat(b.actualPnl)||0;}
+      else if(sortField==="tradeN"){va=parseInt(a.tradeN)||0;vb=parseInt(b.tradeN)||0;}
+      else if(sortField==="rating"){va=parseInt(a.tradeRating)||0;vb=parseInt(b.tradeRating)||0;}
+      else{va=a.date||"";vb=b.date||"";}
+      if(va<vb) return sortDir==="asc"?-1:1;
+      if(va>vb) return sortDir==="asc"?1:-1;
+      return 0;
+    });
+    return r;
+  },[trades,filterSymbol,filterStrategy,advFilters,sortField,sortDir]);
+  const metrics=useMemo(()=>calcMetrics(filtered),[filtered]);
+  const equityCurve=useMemo(()=>{let cum=0;return [...filtered].reverse().map((t,i)=>({i:i+1,pnl:(cum+=t.actualPnl),tradePnl:t.actualPnl,date:t.date,symbol:t.symbol,strategy:t.strategy}));},[filtered]);
+  const pnlByDay=useMemo(()=>{const m={};const cnt={};filtered.forEach(t=>{m[t.date]=(m[t.date]||0)+t.actualPnl;cnt[t.date]=(cnt[t.date]||0)+1;});return Object.entries(m).sort().map(([d,p])=>({date:d.slice(5),fullDate:d,pnl:p,count:cnt[d]}));},[filtered]);
+  const stratStats=useMemo(()=>{const m={};filtered.forEach(t=>{if(!m[t.strategy])m[t.strategy]={strategy:t.strategy,pnl:0,count:0,wins:0};m[t.strategy].pnl+=t.actualPnl;m[t.strategy].count++;if(t.actualPnl>0)m[t.strategy].wins++;});return Object.values(m).sort((a,b)=>b.pnl-a.pnl);},[filtered]);
+  const gammaStats=useMemo(()=>{const m={};filtered.forEach(t=>{const levels=Array.isArray(t.gammaLevels)?t.gammaLevels:(t.gammaLevel?[t.gammaLevel]:[]);levels.forEach(g=>{if(!m[g])m[g]={level:g,count:0,pnl:0,wins:0};m[g].count++;m[g].pnl+=t.actualPnl;if(t.actualPnl>0)m[g].wins++;});});return Object.values(m).sort((a,b)=>b.count-a.count);},[filtered]);
+
+  function setF(k,v){setForm(f=>({...f,[k]:v}));}
+  const pnlColor=(v)=>(parseFloat(v)||0)>=0?C.green:C.red;
+
+  function openNew(){
+    const nextN=trades.length+1;
+    setForm({...EMPTY_FORM,tradeN:nextN,date:new Date().toISOString().split("T")[0]});
+    setEditTrade(null);setShowForm(true);
+  }
+
+  async function handleSave(){
+    if(!form.symbol) return;
+    setSaving(true);
+    const parse=(v)=>v===""?"":parseFloat(v)||0;
+    const trade={...form,tradeN:parseInt(form.tradeN)||0,contracts:parse(form.contracts),entryPrice:parse(form.entryPrice),targetPrice:parse(form.targetPrice),stopPrice:parse(form.stopPrice),partial1Price:parse(form.partial1Price),partial1Contracts:parse(form.partial1Contracts),partial2Price:parse(form.partial2Price),partial2Contracts:parse(form.partial2Contracts),finalTargetPrice:parse(form.finalTargetPrice),profitTarget:parse(form.profitTarget),actualPnl:parse(form.actualPnl)};
+    try{
+      if(editTrade&&editTrade._docId){
+        await window.fsUpdateDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/trades`,editTrade._docId),trade);
+        setTrades(ts=>ts.map(t=>t._docId===editTrade._docId?{...trade,_docId:editTrade._docId}:t));
+      } else {
+        const docRef=await window.fsAddDoc(window.fsCollection(window.db,`users/${currentUser?.uid||"_"}/trades`),trade);
+        setTrades(ts=>[{...trade,_docId:docRef.id},...ts]);
+      }
+    }catch(e){console.error(e);}
+    setSaving(false);setShowForm(false);setEditTrade(null);
+  }
+
+  function handleEdit(t){setEditTrade(t);setForm({...t});setShowForm(true);}
+
+  async function confirmDeleteTrade(){
+    try{
+      await window.fsDeleteDoc(window.fsDoc(window.db,`users/${currentUser?.uid}/trades`,confirmDelete));
+      setTrades(ts=>ts.filter(t=>t._docId!==confirmDelete));
+    }catch(e){}
+    setConfirmDelete(null);
+  }
+
+  const [seeding,setSeeding]=useState(false);
+  const seedingRef = React.useRef(false);
+  const isDemoActive = trades.length > 0;
+  const DEMO_USERS = ["tradingmarcon@gmail.com"]; // only these emails see demo buttons
+  const isDemoUser = DEMO_USERS.includes(currentUser?.email);
+
+  async function clearAllTrades(){
+    if(seedingRef.current) return;
+    seedingRef.current = true; setSeeding(true);
+    try{
+      const uid = currentUser?.uid;
+      if(!uid) return;
+      const snapshot = await window.fsGetDocs(window.fsCollection(window.db,`users/${uid}/trades`));
+      await Promise.all(snapshot.docs.map(d=>window.fsDeleteDoc(window.fsDoc(window.db,`users/${uid}/trades`,d.id))));
+      setTrades([]);
+    }catch(e){console.error("clear error",e); setTrades([]);}
+    finally{ seedingRef.current = false; setSeeding(false); }
+  }
+
+  async function seedDemoData(){
+    if(seedingRef.current) return;
+    const uid = currentUser?.uid;
+    if(!uid){ return; }
+    seedingRef.current = true; setSeeding(true);
+    try{
+      const snapshot = await window.fsGetDocs(window.fsCollection(window.db,`users/${uid}/trades`));
+      await Promise.all(snapshot.docs.map(d=>window.fsDeleteDoc(window.fsDoc(window.db,`users/${uid}/trades`,d.id))));
+    }catch(e){console.error("clear error",e);}
+
+    const symbols=["NQ","ES","CL","GC","RTY","YM","NG","SI"];
+    const strategies=["ORB","VWAP Fade","Gamma Level","ICT SMC","Supply/Demand","Momentum","Mean Reversion","Breakout Retest"];
+    const psychologies=[
+      "Feeling extremely confident today, had a clear read on the market structure and trusted my levels completely. No hesitation on entry.",
+      "Woke up anxious — lots of news overnight. I was jumpy on the trigger and almost exited before my target. Managed to hold but it was uncomfortable.",
+      "Very calm and patient. Waited over an hour for the setup to confirm before entering. This is exactly the mental state I want every session.",
+      "Tired from poor sleep. My reaction time felt slow and I second-guessed my read twice. I probably should have sat out today.",
+      "Felt impulsive — I was frustrated from missing the earlier move and chased this entry 8 ticks late. Knew it was wrong as I clicked.",
+      "Completely mechanical today. No emotion, just followed the rules. Didn't feel attached to the outcome either way.",
+      "Overconfident after a 3-day winning streak. Sized up to 8 contracts when my normal is 4. The win felt lucky, not earned.",
+      "Dealing with family stress all morning. I kept checking my phone and couldn't stay focused on price action. Should have skipped.",
+      "Sharp and locked in. Pre-market prep paid off — I had my key levels marked and just waited for price to come to me.",
+      "Felt greedy after seeing the move I missed. Entered without a clear stop in mind, was just hoping it would keep going.",
+      "Bit nervous going into the Fed announcement but managed the position well. Reduced size to 2 contracts which helped me stay calm.",
+      "In the zone — flow state. Every decision felt natural and effortless. I knew exactly what the market was doing.",
+      "Mildly distracted, had meetings before the session. Felt behind mentally, like I was always one step slow in my analysis.",
+      "Revenge trading after yesterday's loss. I knew it but couldn't stop myself. Entered aggressively and without patience.",
+      "Very disciplined today despite a difficult morning with a stop-out. Reset mentally, came back focused and took a clean second setup.",
+      "Euphoric after yesterday. I felt untouchable which scared me. Kept second-guessing whether to take profits too early.",
+      "Calm but cautious — lower confidence than usual. Took reduced size and was okay with a smaller winner. Controlled the risk well.",
+      "Extremely frustrated mid-session after a false breakout stopped me out. Had to step away for 20 minutes before re-entering.",
+      "Solid mental state, pre-planned everything the night before. No surprises, just execution. Felt professional.",
+      "Anxious about a personal financial situation outside of trading. Hard to separate it from my decision-making at the desk.",
+    ];
+    const gammaOpts=GAMMA_LEVELS;
+    function rnd(min,max){return min+Math.random()*(max-min);}
+    function rndInt(min,max){return Math.floor(rnd(min,max+1));}
+    function pickArr(arr){return arr[rndInt(0,arr.length-1)];}
+    function fmtHour(h,m){return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;}
+
+    // Base prices per symbol
+    const bases={NQ:18500,ES:5200,CL:78,GC:2340,RTY:2040,YM:38500,NG:2.1,SI:27};
+    const ticks={NQ:0.25,ES:0.25,CL:0.01,GC:0.10,RTY:0.10,YM:1,NG:0.001,SI:0.005};
+    const mults={NQ:20,ES:50,CL:1000,GC:100,RTY:10,YM:5,NG:10000,SI:5000};
+
+    const demoPnls=[820,-340,1240,560,-180,940,1680,-420,320,1100,
+                    -250,780,2200,-680,440,1560,-120,890,1340,-380,
+                    620,1980,-290,740,1120,-460,980,1640,540,-220];
+
+    const added=[];
+    for(let i=0;i<30;i++){
+      const daysAgo=Math.floor(i/2)+Math.floor(i%3);
+      const d=new Date(); d.setDate(d.getDate()-daysAgo);
+      const dateStr=d.toISOString().split("T")[0];
+      const sym=pickArr(symbols);
+      const dir=Math.random()>0.42?"Long":"Short";
+      const base=bases[sym];
+      const tick=ticks[sym];
+      const mult=mults[sym];
+      const contracts=rndInt(1,6);
+      const ep=parseFloat((base+rnd(-base*0.003,base*0.003)).toFixed(2));
+      const stopDist=rnd(base*0.001,base*0.004);
+      const sp=dir==="Long"?parseFloat((ep-stopDist).toFixed(2)):parseFloat((ep+stopDist).toFixed(2));
+      const tgtDist=stopDist*rnd(1.5,3.5);
+      const tp=dir==="Long"?parseFloat((ep+tgtDist).toFixed(2)):parseFloat((ep-tgtDist).toFixed(2));
+      const pnl=demoPnls[i];
+      const ptgt=parseFloat((Math.abs(pnl)*rnd(0.8,1.3)).toFixed(0));
+      const entryH=rndInt(9,14); const exitH=entryH+rndInt(0,3);
+      const glevels=Math.random()>0.5?[pickArr(gammaOpts)]:[];
+      const stratFollowed=pnl>0?(Math.random()>0.1?"Yes":"No"):(Math.random()>0.5?"Yes":"No");
+      const trade={
+        tradeN:i+1, date:dateStr, symbol:sym, direction:dir, contracts,
+        entryHour:fmtHour(entryH,rndInt(0,59)), exitHour:fmtHour(exitH,rndInt(0,59)),
+        strategy:pickArr(strategies), gammaLevels:glevels,
+        entryPrice:ep, targetPrice:tp, stopPrice:sp,
+        partialType:(()=>{const r=Math.random();return r>0.65?"Both":r>0.35?"Partial 1":"None";})(),
+        partial1Price:parseFloat((ep*(1+rnd(0.001,0.003))).toFixed(2)), partial1Contracts:Math.max(1,Math.floor(contracts/2)), partial1Hit:Math.random()>0.4?"Yes":"No",
+        partial2Price:parseFloat((ep*(1+rnd(0.003,0.006))).toFixed(2)), partial2Contracts:Math.max(1,Math.floor(contracts/3)), partial2Hit:Math.random()>0.6?"Yes":"No",
+        finalTargetPrice:tp, finalTargetHit:pnl>ptgt*0.9?"Yes":"No",
+        actualFinalLevel:"", profitTarget:ptgt, actualPnl:pnl,
+        strategyFollowed:stratFollowed, stopRespected:pnl>0?(Math.random()>0.15?"Yes":"No"):(Math.random()>0.45?"Yes":"No"), psychology:pickArr(psychologies),
+        comments:pnl>0?"Clean setup, executed well.":"Need to review entry timing.",
+        chartImage:"",
+      };
+      try{
+        const ref=await window.fsAddDoc(window.fsCollection(window.db,`users/${uid}/trades`),trade);
+        added.push({...trade,_docId:ref.id});
+      }catch(e){console.error(e);}
+    }
+    if(added.length>0) setTrades([...added].sort((a,b)=>new Date(b.date)-new Date(a.date)));
+    else setTrades([]);
+    seedingRef.current = false; setSeeding(false);
+  }
+
+
+
+  if(!loggedIn) return <LoginScreen onLogin={login}/>;
+
+  if(!dbReady||loading) return (
+    <div style={{minHeight:"100vh",background:"#0f1117",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16}}>
+      <div style={{width:44,height:44,border:"3px solid #252836",borderTop:"3px solid #22C55E",borderRadius:"50%",animation:"spin 1s linear infinite"}}/>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{fontSize:15,color:"#475569",fontWeight:500,fontFamily:"'Barlow Condensed',sans-serif"}}>Loading your data...</div>
+    </div>
+  );
+
+  return (
+    <div style={{background:C.bg,minHeight:"100vh",fontFamily:"'Barlow Condensed',sans-serif",color:C.text,display:"flex",flexDirection:"column"}}>
+      <style>{`
+        *{box-sizing:border-box}
+        select option{background:${C.panel};color:${C.text}}
+        input[type=time],input[type=date]{color-scheme:${theme==="dark"?"dark":"light"}}
+        input:focus,select:focus,textarea:focus{border-color:#22C55E!important;outline:none;box-shadow:0 0 0 3px rgba(124,108,248,0.1)}
+        .tr-row{transition:background 0.15s}
+        .tr-row:hover{background:${C.border}!important}
+        .chip-btn{transition:all 0.15s;cursor:pointer;border:none;background:none;font-family:inherit}
+        .tab-btn{transition:all 0.2s;cursor:pointer;border:none;background:none;font-family:inherit}
+        .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .analysis-grid>*{min-width:0;overflow:hidden}
+        .stat-summary-grid{grid-template-columns:repeat(5,1fr)}
+        .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+        .dashboard-charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+        .gamma-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+        .metric-card{transition:all 0.2s}
+        .metric-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+        .icon-btn{background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-family:inherit}
+        .icon-btn:hover{background:${C.border}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        .fade-in{animation:fadeIn 0.3s ease forwards}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+        .live-dot{animation:pulse 2s ease-in-out infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        /* ── RESPONSIVE ─────────────────────── */
+        *{box-sizing:border-box}
+        .app-header-inner{padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px;gap:8px;width:100%}
+        .app-nav-wrap{display:flex;gap:4px;background:${C.card};border-radius:12px;padding:4px;flex-shrink:0}
+        .header-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+        .hamburger-btn{display:none;background:none;border:1px solid ${C.border};border-radius:10px;padding:0 12px;cursor:pointer;font-size:20px;color:${C.text};height:40px;line-height:1;flex-shrink:0}
+        .mobile-menu{display:none;flex-direction:column;padding:8px;border-bottom:1px solid ${C.border};background:${C.card}}
+        .mobile-menu.open{display:flex}
+        .mobile-tab-btn{background:none;border:none;color:${C.muted};font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;padding:13px 18px;text-align:left;cursor:pointer;border-radius:10px;letter-spacing:0.03em;transition:background 0.15s}
+        .mobile-tab-btn.active{background:${C.border};color:${C.text}}
+        .btn-lbl{display:inline}
+        .header-brand-name{display:inline}
+        .header-live-badge{display:flex}
+
+        /* tablet */
+        @media(max-width:1100px){
+          .app-nav-wrap .tab-btn{padding:10px 14px;font-size:13px}
+        }
+
+        /* mobile nav breakpoint */
+        @media(max-width:900px){
+          .app-nav-wrap{display:none}
+          .hamburger-btn{display:flex;align-items:center;justify-content:center}
+          .app-header-inner{height:54px;padding:0 14px;gap:6px}
+          .btn-lbl{display:none}
+          .header-brand-name{display:none}
+          .header-live-badge{display:none}
+          .header-right{gap:5px}
+          .hdr-hide-mob{display:none!important}
+          .header-right>button{padding:8px 10px!important;height:38px!important}
+        }
+
+        /* mobile */
+        @media(max-width:640px){
+          html,body{overflow-x:hidden;width:100%;max-width:100vw}
+          .app-header-inner{height:50px;padding:0 10px;gap:4px}
+          .content-pad{padding:8px 10px!important}
+          .filter-bar{padding:7px 8px!important;gap:4px!important;margin-bottom:10px!important;border-radius:10px!important}
+          .filter-bar .chip-btn{padding:4px 10px!important;font-size:12px!important;border-radius:14px!important}
+          .metric-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+          .metric-card{padding:14px 12px!important;border-radius:12px!important}
+          .metric-card div:nth-child(2){font-size:28px!important}
+          .dashboard-charts-grid{grid-template-columns:1fr!important}
+          .psych-row{flex-direction:row;flex-wrap:wrap;gap:6px!important}
+          .psych-card{min-width:calc(50% - 6px)!important;flex:1 1 calc(50% - 6px)!important;padding:12px 6px!important}
+          .table-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100vw;border-radius:12px}
+          .table-scroll-wrap table{min-width:900px}
+          .header-actions button{padding:8px 12px!important;font-size:13px!important;height:36px!important}
+          .analysis-grid{grid-template-columns:1fr!important}
+          .analysis-grid>div{padding:14px 12px!important;box-sizing:border-box}
+          .gamma-grid{grid-template-columns:1fr 1fr!important}
+          .stat-summary-grid{grid-template-columns:1fr 1fr!important}
+          .form-grid{grid-template-columns:1fr 1fr!important}
+          .strat-row{flex-wrap:nowrap!important;overflow:hidden;max-width:100%}
+          .strat-meta{flex-wrap:nowrap!important;gap:4px!important;min-width:0;overflow:hidden;flex-shrink:1}
+          .strat-meta span:first-child{font-size:12px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          .strat-meta-text{font-size:12px!important}
+          .strat-pnl{font-size:14px!important;flex-shrink:0}
+        }
+
+        /* small phones */
+        @media(max-width:400px){
+          .metric-grid{grid-template-columns:1fr!important}
+          .psych-card{min-width:100%!important;flex:1 1 100%!important}
+          .app-header-inner{padding:0 8px}
+          .content-pad{padding:6px 8px!important}
+          .analysis-grid{grid-template-columns:1fr!important}
+          .gamma-grid{grid-template-columns:1fr!important}
+          .stat-summary-grid{grid-template-columns:1fr 1fr!important}
+          .form-grid{grid-template-columns:1fr!important}
+        }
+      `}</style>
+
+      {/* HEADER */}
+      <header style={{borderBottom:`1px solid ${C.border}`,background:C.panel,position:"sticky",top:0,zIndex:100}}>
+        <div className="app-header-inner">
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <img src={darkMode?"image_dark.png":"image2.png"} style={{height:56,width:"auto",flexShrink:0}}/>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginLeft:4,padding:"3px 10px",border:`1px solid ${C.green}40`,borderRadius:20,background:`${C.green}10`}}>
+              <div className="live-dot" style={{width:6,height:6,borderRadius:"50%",background:C.green}}/>
+              <span style={{fontSize:11,color:C.green,fontWeight:600}}>Live</span>
+            </div>
+          </div>
+          <nav className="app-nav-wrap">
+            {[["dashboard",T.dashboard],["trades",T.trades],["analise",T.analysis],["calendar",T.calendar],["news",T.news]].map(([v,l])=>(
+              <button key={v} className="tab-btn" onClick={()=>setTab(v)} style={{padding:"10px 28px",fontSize:15,fontWeight:700,borderRadius:10,color:tab===v?C.text:C.muted,background:tab===v?C.border:"transparent",border:"none"}}>
+                {l}
+              </button>
+            ))}
+          </nav>
+          <button className="hamburger-btn" onClick={()=>setMobileMenuOpen(v=>!v)}>☰</button>
+          <div className="header-right" style={{display:"flex",gap:6,alignItems:"center"}}>
+
+            {/* ── LANGUAGE SELECTOR ── */}
+            <div className="hdr-hide-mob" style={{position:"relative"}} data-langmenu="1">
+              <button
+                onClick={()=>setShowLangMenu(v=>!v)}
+                style={{background:"none",color:C.sub,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 18px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6,height:43}}
+              >
+                {lang==="pt"?"🇧🇷 PT":lang==="es"?"🇪🇸 ES":"🇺🇸 EN"}
+                <span style={{fontSize:9,opacity:0.6,marginLeft:2}}>▼</span>
+              </button>
+              {showLangMenu&&(
+                <div style={{position:"absolute",top:"calc(100% + 6px)",right:0,background:C.card,border:`1px solid ${C.borderHi}`,borderRadius:10,overflow:"hidden",zIndex:999,minWidth:130,boxShadow:"0 8px 24px rgba(0,0,0,0.3)"}}>
+                  {[{code:"en",flag:"🇺🇸",label:"English"},{code:"pt",flag:"🇧🇷",label:"Português"},{code:"es",flag:"🇪🇸",label:"Español"}].map(({code,flag,label})=>(
+                    <button key={code} onClick={()=>{setLang(code);localStorage.setItem("tj_lang",code);setShowLangMenu(false);}}
+                      style={{width:"100%",background:lang===code?C.border:"transparent",color:lang===code?C.text:C.sub,border:"none",padding:"10px 16px",fontSize:13,fontWeight:lang===code?700:500,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:10,textAlign:"left"}}
+                    >
+                      <span style={{fontSize:16}}>{flag}</span>
+                      {label}
+                      {lang===code&&<span style={{marginLeft:"auto",color:C.accent,fontSize:14}}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── DARK / LIGHT TOGGLE ── */}
+            <button
+              onClick={()=>{const nt=theme==="dark"?"light":"dark";setTheme(nt);localStorage.setItem("tj_theme",nt);}}
+              title={theme==="dark"?"Switch to Light Mode":"Switch to Dark Mode"}
+              style={{background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:0,height:43}}
+            >
+              <div style={{width:44,height:22,borderRadius:11,background:theme==="dark"?"#1E293B":"#e2e8f0",position:"relative",transition:"background 0.3s",border:`1px solid ${C.borderHi}`}}>
+                <div style={{position:"absolute",top:2,left:theme==="dark"?2:22,width:16,height:16,borderRadius:"50%",background:theme==="dark"?"#22C55E":"#f59e0b",transition:"left 0.25s cubic-bezier(.4,0,.2,1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10}}>
+                  {theme==="dark"?"🌙":"☀️"}
+                </div>
+              </div>
+            </button>
+
+            <button className="hdr-hide-mob" onClick={()=>setShowManage(true)} style={{background:"none",color:C.sub,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",height:43}}>⚙ <span className="btn-lbl">{T.manage}</span></button>
+            {isDemoUser && (isDemoActive
+              ? <button onClick={clearAllTrades} disabled={seeding} style={{background:seeding?"#334155":"linear-gradient(135deg,#ef4444,#b91c1c)",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontSize:14,fontWeight:700,cursor:seeding?"not-allowed":"pointer",fontFamily:"inherit",height:43,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                  {seeding?"⏳":"🗑️"}<span className="btn-lbl"> {seeding?"Limpando...":"Limpar Dados"}</span>
+                </button>
+              : <button onClick={seedDemoData} disabled={seeding} style={{background:seeding?"#334155":"linear-gradient(135deg,#f59e0b,#ef4444)",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontSize:14,fontWeight:700,cursor:seeding?"not-allowed":"pointer",fontFamily:"inherit",height:43,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
+                  {seeding?"⏳":"🎲"}<span className="btn-lbl"> {seeding?"Carregando...":"Demo Data"}</span>
+                </button>
+            )}
+            <button onClick={openNew} style={{background:`linear-gradient(135deg,${C.accent},${C.purple})`,color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",height:43}}><span className="btn-lbl">{T.addTrade}</span></button>
+            {/* User + logout */}
+            <div className="hdr-hide-mob" style={{display:"flex",alignItems:"center",gap:8,background:C.panel,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 12px",height:43,boxSizing:"border-box",cursor:"pointer"}} onClick={()=>setShowAccount(true)}>
+              {userPhotoURL
+                ? <img src={userPhotoURL} style={{width:28,height:28,borderRadius:"50%",objectFit:"cover",flexShrink:0,border:"1px solid #22C55E"}}/>
+                : <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff",flexShrink:0}}>
+                    {currentUser?.displayName?.[0]?.toUpperCase()||currentUser?.email?.[0]?.toUpperCase()||"U"}
+                  </div>
+              }
+              <span style={{fontSize:13,color:C.sub,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentUser?.displayName||currentUser?.email||""}</span>
+              <button onClick={e=>{e.stopPropagation();logout();}} style={{background:"none",color:C.muted,border:"none",cursor:"pointer",fontSize:16,padding:"0 4px",lineHeight:1}} title={T.logout}>⏻</button>
+            </div>
+          </div>
+        </div>
+        {/* MOBILE MENU */}
+        <div className={`mobile-menu${mobileMenuOpen?" open":""}`}>
+          {[["dashboard",T.dashboard],["trades",T.trades],["analise",T.analysis],["calendar",T.calendar],["news",T.news]].map(([v,l])=>(
+            <button key={v} className={`mobile-tab-btn${tab===v?" active":""}`} onClick={()=>{setTab(v);setMobileMenuOpen(false);}}>
+              {l}
+            </button>
+          ))}
+          <div style={{height:1,background:C.border,margin:"4px 8px"}}/>
+          <div style={{display:"flex",gap:6,padding:"4px 8px 8px"}}>
+            <button onClick={()=>{setShowManage(true);setMobileMenuOpen(false);}} style={{flex:1,background:"none",color:C.sub,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 12px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>⚙ {T.manage}</button>
+            <button onClick={logout} style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 14px",fontSize:16,cursor:"pointer",fontFamily:"inherit"}} title={T.logout}>⏻</button>
+          </div>
+        </div>
+      </header>
+
+      {/* TICKER BAR - TradingView real-time */}
+      <TickerBar/>
+
+      <div className="content-pad" style={{padding:"16px 24px",minHeight:"calc(100vh - 106px)",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        {/* FILTER BAR - hidden on News tab */}
+        {tab!=="news" && (()=>{
+          const advActive = advFilters.dateFrom||advFilters.dateTo||advFilters.strategyFollowed!=="All"||advFilters.hasPartial1||advFilters.hasPartial2||advFilters.onlyWins||advFilters.onlyLosses||advFilters.gammaLevels.length>0||advFilters.direction!=="All"||advFilters.strategies.length>0||advFilters.minRating>0;
+          const resetAdv=()=>setAdvFilters({dateFrom:"",dateTo:"",strategyFollowed:"All",hasPartial1:false,hasPartial2:false,onlyWins:false,onlyLosses:false,gammaLevels:[],direction:"All",strategies:[],minRating:0});
+          const toggleGL=(g)=>setAdvFilters(f=>({...f,gammaLevels:f.gammaLevels.includes(g)?f.gammaLevels.filter(x=>x!==g):[...f.gammaLevels,g]}));
+          const toggleStr=(s)=>setAdvFilters(f=>({...f,strategies:f.strategies.includes(s)?f.strategies.filter(x=>x!==s):[...f.strategies,s]}));
+          const SortBtn=({field,label})=>{
+            const active=sortField===field;
+            return <button onClick={()=>{if(active)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortField(field);setSortDir("desc");}}} style={{padding:"6px 14px",borderRadius:8,fontSize:13,fontWeight:700,border:`1px solid ${active?C.accent:C.border}`,color:active?"#fff":C.muted,background:active?C.accent:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,fontFamily:"inherit"}}>
+              {label} {active?(sortDir==="desc"?"↓":"↑"):"↕"}
+            </button>;
+          };
+          return <div style={{marginBottom:16}}>
+            {/* Row 1: Symbol + Strategy chips + Sort + Filter btn */}
+            <div className="filter-bar" style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",padding:"10px 16px",background:C.panel,border:`1px solid ${C.border}`,borderRadius:showAdvFilter?"14px 14px 0 0":"14px"}}>
+              <span style={{fontSize:14,color:C.muted,fontWeight:700}}>{T.thSymbol||"Símbolo"}</span>
+              {symbols.map(s=>(<button key={s} className="chip-btn" onClick={()=>setFilterSymbol(s)} style={{padding:"5px 14px",borderRadius:20,fontSize:14,fontWeight:700,border:`1px solid ${filterSymbol===s?C.accent:C.border}`,color:filterSymbol===s?"#fff":C.muted,background:filterSymbol===s?C.accent:"none"}}>{s==="All"?(T.filterAll||"All"):s}</button>))}
+              <div style={{width:1,background:C.border,height:16,margin:"0 4px"}}/>
+              <span style={{fontSize:14,color:C.muted,fontWeight:700}}>{T.thStrategy||"Estratégia"}</span>
+              {usedStrategies.map(s=>(<button key={s} className="chip-btn" onClick={()=>setFilterStrategy(s)} style={{padding:"5px 14px",borderRadius:20,fontSize:14,fontWeight:700,border:`1px solid ${filterStrategy===s?C.purple:C.border}`,color:filterStrategy===s?"#fff":C.muted,background:filterStrategy===s?C.purple:"none"}}>{s==="All"?(T.filterAll||"All"):s}</button>))}
+              <div style={{flex:1}}/>
+              {tab==="trades"&&<><SortBtn field="tradeN" label="#"/><SortBtn field="date" label={T.thDate||"Data"}/><SortBtn field="pnl" label="PnL"/><SortBtn field="rating" label="⭐"/><div style={{width:1,background:C.border,height:16,margin:"0 2px"}}/></>}
+              {/* Advanced filter button */}
+              <button onClick={()=>setShowAdvFilter(v=>!v)} style={{padding:"6px 14px",borderRadius:8,fontSize:13,fontWeight:700,border:`1px solid ${advActive?C.amber:showAdvFilter?C.accent:C.border}`,color:advActive?C.amber:showAdvFilter?"#fff":C.muted,background:showAdvFilter?C.accent:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:"inherit"}}>
+                ⚙ Filtros {advActive?<span style={{background:C.amber,color:"#000",borderRadius:"50%",width:16,height:16,fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{[advFilters.dateFrom,advFilters.dateTo,advFilters.strategyFollowed!=="All",advFilters.hasPartial1,advFilters.hasPartial2,advFilters.onlyWins,advFilters.onlyLosses,advFilters.direction!=="All",advFilters.minRating>0].filter(Boolean).length+advFilters.gammaLevels.length+advFilters.strategies.length}</span>:null}
+              </button>
+              {advActive&&<button onClick={resetAdv} style={{padding:"6px 10px",borderRadius:8,fontSize:12,fontWeight:700,border:`1px solid ${C.red}`,color:C.red,background:"none",cursor:"pointer",fontFamily:"inherit"}}>✕ Limpar</button>}
+              <span style={{fontSize:13,color:C.muted}}>{filtered.length} {T.tradeCount?T.tradeCount(1).replace("1 ",""):""}</span>
+            </div>
+            {/* Row 2: Advanced filter panel */}
+            {showAdvFilter&&<div style={{background:C.card,border:`1px solid ${C.border}`,borderTop:"none",borderRadius:"0 0 14px 14px",padding:"16px 20px",display:"flex",flexDirection:"column",gap:14}}>
+              {/* Date range */}
+              <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700,minWidth:80}}>Período</span>
+                <input type="date" value={advFilters.dateFrom} onChange={e=>setAdvFilters(f=>({...f,dateFrom:e.target.value}))} style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.text,fontSize:13,fontFamily:"inherit"}}/>
+                <span style={{color:C.muted,fontSize:13}}>→</span>
+                <input type="date" value={advFilters.dateTo} onChange={e=>setAdvFilters(f=>({...f,dateTo:e.target.value}))} style={{background:C.panel,border:`1px solid ${C.border}`,borderRadius:8,padding:"5px 10px",color:C.text,fontSize:13,fontFamily:"inherit"}}/>
+              </div>
+              {/* Direction + Result + Strategy Followed + Partials */}
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700,minWidth:80}}>Direção</span>
+                {["All","Long","Short"].map(d=><button key={d} onClick={()=>setAdvFilters(f=>({...f,direction:d}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.direction===d?(d==="Long"?C.green:d==="Short"?C.red:C.accent):C.border}`,color:advFilters.direction===d?"#fff":C.muted,background:advFilters.direction===d?(d==="Long"?C.green:d==="Short"?C.red:C.accent):"none",cursor:"pointer",fontFamily:"inherit"}}>{d==="All"?(T.filterAll||"Todos"):d}</button>)}
+                <div style={{width:1,background:C.border,height:16,margin:"0 4px"}}/>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700}}>Resultado</span>
+                <button onClick={()=>setAdvFilters(f=>({...f,onlyWins:!f.onlyWins,onlyLosses:false}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.onlyWins?C.green:C.border}`,color:advFilters.onlyWins?"#fff":C.muted,background:advFilters.onlyWins?C.green:"none",cursor:"pointer",fontFamily:"inherit"}}>✓ Lucro</button>
+                <button onClick={()=>setAdvFilters(f=>({...f,onlyLosses:!f.onlyLosses,onlyWins:false}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.onlyLosses?C.red:C.border}`,color:advFilters.onlyLosses?"#fff":C.muted,background:advFilters.onlyLosses?C.red:"none",cursor:"pointer",fontFamily:"inherit"}}>✗ Perda</button>
+                <div style={{width:1,background:C.border,height:16,margin:"0 4px"}}/>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700}}>Estratégia Seguida</span>
+                {["All","Yes","No"].map(v=><button key={v} onClick={()=>setAdvFilters(f=>({...f,strategyFollowed:v}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.strategyFollowed===v?C.accent:C.border}`,color:advFilters.strategyFollowed===v?"#fff":C.muted,background:advFilters.strategyFollowed===v?C.accent:"none",cursor:"pointer",fontFamily:"inherit"}}>{v==="All"?(T.filterAll||"Todos"):v==="Yes"?"Sim":"Não"}</button>)}
+                <div style={{width:1,background:C.border,height:16,margin:"0 4px"}}/>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700}}>Parciais</span>
+                <button onClick={()=>setAdvFilters(f=>({...f,hasPartial1:!f.hasPartial1}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.hasPartial1?C.purple:C.border}`,color:advFilters.hasPartial1?"#fff":C.muted,background:advFilters.hasPartial1?C.purple:"none",cursor:"pointer",fontFamily:"inherit"}}>P1</button>
+                <button onClick={()=>setAdvFilters(f=>({...f,hasPartial2:!f.hasPartial2}))} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.hasPartial2?C.purple:C.border}`,color:advFilters.hasPartial2?"#fff":C.muted,background:advFilters.hasPartial2?C.purple:"none",cursor:"pointer",fontFamily:"inherit"}}>P1+P2</button>
+              </div>
+              {/* Strategies multi-select */}
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700,minWidth:80}}>Estratégias</span>
+                {strategies.filter(Boolean).map(s=><button key={s} onClick={()=>toggleStr(s)} style={{padding:"5px 14px",borderRadius:20,fontSize:13,fontWeight:700,border:`1px solid ${advFilters.strategies.includes(s)?C.purple:C.border}`,color:advFilters.strategies.includes(s)?"#fff":C.muted,background:advFilters.strategies.includes(s)?C.purple:"none",cursor:"pointer",fontFamily:"inherit"}}>{s}</button>)}
+              </div>
+              {/* Gamma levels multi-select */}
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700,minWidth:80}}>Gamma</span>
+                {GAMMA_LEVELS.map(g=><button key={g} onClick={()=>toggleGL(g)} style={{padding:"5px 12px",borderRadius:20,fontSize:12,fontWeight:700,border:`1px solid ${advFilters.gammaLevels.includes(g)?C.amber:C.border}`,color:advFilters.gammaLevels.includes(g)?"#000":C.muted,background:advFilters.gammaLevels.includes(g)?C.amber:"none",cursor:"pointer",fontFamily:"inherit"}}>{g}</button>)}
+              </div>
+              {/* Star rating filter */}
+              <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <span style={{fontSize:13,color:C.muted,fontWeight:700,minWidth:80}}>{T.filterRating||"Avaliação"}</span>
+                {[0,1,2,3,4,5].map(n=>{
+                  const isActive = advFilters.minRating===n;
+                  const isTodos = n===0;
+                  return (
+                    <button key={n} onClick={()=>setAdvFilters(f=>({...f,minRating:f.minRating===n&&n>0?0:n}))}
+                      style={{padding:"5px 12px",borderRadius:20,fontSize:13,fontWeight:700,
+                        border:`1px solid ${isActive?(isTodos?C.accent:C.amber):C.border}`,
+                        color:isActive?(isTodos?"#fff":"#000"):C.muted,
+                        background:isActive?(isTodos?C.accent:C.amber):"none",cursor:"pointer",fontFamily:"inherit"}}>
+                      {isTodos?(T.filterAll||"Todos"):`${"★".repeat(n)}${"☆".repeat(5-n)}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>}
+          </div>;
+        })()}
+
+        {/* DASHBOARD */}
+        {tab==="dashboard" && (
+          <div className="fade-in" style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
+            <div className="metric-grid" style={{display:"grid",gap:10}}>
+              {[
+                {label:T.totalPnl,value:fmt(metrics.totalPnl),color:pnlColor(metrics.totalPnl),sub:`${metrics.totalTrades} trades`},
+                {label:T.winRate,value:metrics.winRate.toFixed(1)+"%",color:metrics.winRate>=50?C.green:C.red,sub:`${filtered.filter(t=>t.actualPnl>0).length}W / ${filtered.filter(t=>t.actualPnl<0).length}L`},
+                {label:T.profitFactor,value:metrics.profitFactor.toFixed(2)+"x",color:metrics.profitFactor>=1.5?C.green:metrics.profitFactor>=1?C.amber:C.red,sub:T.grossProfit},
+                {label:T.maxDrawdown,value:"−$"+metrics.maxDrawdown.toFixed(0),color:C.red,sub:T.peakTrough},
+                {label:T.avgWin,value:fmt(metrics.avgWin),color:C.green,sub:T.perWin},
+                {label:T.avgLoss,value:"−$"+metrics.avgLoss.toFixed(0),color:C.red,sub:T.perLoss},
+                {label:T.avgRating||"Avaliação Média",value:metrics.avgRating>0?("★".repeat(Math.round(metrics.avgRating))+"☆".repeat(5-Math.round(metrics.avgRating))):"—",color:C.amber,sub:metrics.avgRating>0?`${metrics.avgRating.toFixed(1)}/5.0`:(T.noData||"Sem dados"),starDisplay:true},
+                {label:T.bestStrategy,value:metrics.bestStrategy||"—",color:C.accent,sub:T.byTotalPnl,small:true},
+              ].map(m=>(
+                <div key={m.label} className="metric-card" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"24px 26px",flex:1}}>
+                  <div style={{fontSize:16,color:C.muted,fontWeight:600,marginBottom:10}}>{m.label}</div>
+                  {m.starDisplay
+                    ?<div style={{fontSize:28,lineHeight:1,marginBottom:6,letterSpacing:2,color:m.color}}>{m.value}</div>
+                    :<div style={{fontSize:m.small?26:42,fontWeight:800,color:m.color,lineHeight:1,marginBottom:6,fontFamily:"'Barlow Condensed', sans-serif",letterSpacing:"-0.01em"}}>{m.value}</div>
+                  }
+                  <div style={{fontSize:15,color:C.muted}}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* DISCIPLINE SCORE WIDGET */}
+            {(()=>{
+              const ds=metrics.disciplineScore;
+              const dsColor=ds>=80?C.green:ds>=60?C.amber:C.red;
+              const planPct=metrics.stratFollowedRate;
+              const ratedTrades=filtered.filter(t=>t.tradeRating>0);
+              const ratingPct=ratedTrades.length?(ratedTrades.reduce((s,t)=>s+(t.tradeRating||0),0)/ratedTrades.length/5)*100:null;
+              const stopRespTrades=filtered.filter(t=>t.stopRespected!==undefined&&t.stopRespected!==null&&t.stopRespected!=="");
+              const stopPct=stopRespTrades.length ? stopRespTrades.filter(t=>t.stopRespected==="Yes").length/stopRespTrades.length*100 : (()=>{const lossArr=filtered.filter(t=>t.actualPnl<0);if(lossArr.length===0)return 100;const bad=lossArr.filter(t=>{const stop=parseFloat(t.stopPrice)||0,entry=parseFloat(t.entryPrice)||0,contracts=parseFloat(t.contracts)||1;const maxL=stop>0&&entry>0?Math.abs(stop-entry)*contracts*50:0;return maxL>0&&Math.abs(t.actualPnl)>maxL*1.15;});return Math.max(0,100-(bad.length/lossArr.length)*100);})();
+              const pillars=[
+                {label:T.discPlan||"Plano Seguido",pct:planPct,color:planPct>=80?C.green:planPct>=60?C.amber:C.red},
+                {label:T.discStop||"Stop Respeitado",pct:stopPct,color:stopPct>=80?C.green:stopPct>=60?C.amber:C.red},
+                {label:T.discRating||"Avaliação",pct:ratingPct,color:ratingPct!=null?(ratingPct>=70?C.green:ratingPct>=50?C.amber:C.red):C.muted,noData:ratingPct==null},
+              ];
+              return (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"22px 26px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                    <div>
+                      <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>{T.disciplineScore||"Score de Disciplina"}</div>
+                      <div style={{fontSize:13,color:C.muted}}>{T.discPlan||"Plano"} · {T.discStop||"Stop"} · {T.discRating||"Avaliação"}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:52,fontWeight:900,color:dsColor,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{ds}<span style={{fontSize:24,opacity:0.6}}>/100</span></div>
+                      <div style={{fontSize:13,fontWeight:700,color:dsColor,marginTop:2}}>{ds>=80?"🏆 Excelente":ds>=60?"👍 Bom":"⚠️ Melhorar"}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+                    {pillars.map(p=>(
+                      <div key={p.label}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                          <span style={{fontSize:13,color:C.muted,fontWeight:600}}>{p.label}</span>
+                          <span style={{fontSize:13,fontWeight:800,color:p.noData?C.muted:p.color}}>{p.noData?"—":p.pct.toFixed(0)+"%"}</span>
+                        </div>
+                        <div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:(p.noData?0:p.pct)+"%",background:p.noData?C.border:p.color,borderRadius:4,transition:"width 0.6s ease"}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="dashboard-charts-grid" style={{display:"grid",gap:10,flex:1}}>
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22,display:"flex",flexDirection:"column"}}>
+                <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:16}}>{T.equityCurve}</div>
+                <div style={{flex:1,minHeight:160}}><SimpleLineChart data={equityCurve} height={200} T={T}/></div>
+              </div>
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22}}>
+                <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:16}}>{T.pnlByDay}</div>
+                <SimpleBarChart data={pnlByDay} height={180} T={T}/>
+              </div>
+            </div>
+            <PsychologyAI trades={filtered} C={C} lang={lang}/>
+          </div>
+        )}
+
+        {/* TRADES */}
+        {tab==="trades" && (
+          <div style={{flex:1,display:'flex',flexDirection:'column'}} className="fade-in table-scroll-wrap" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,overflow:"auto",flex:1}}>
+
+            {/* Bulk delete bar */}
+            {selectedTrades.size>0 && (
+              <div style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",background:"#ef444415",borderBottom:`1px solid #ef444430`,position:"sticky",top:0,zIndex:10}}>
+                <div style={{width:22,height:22,borderRadius:6,background:C.red,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"#fff",fontWeight:800}}>{selectedTrades.size}</div>
+                <span style={{fontSize:15,fontWeight:700,color:C.red}}>{selectedTrades.size} trade{selectedTrades.size!==1?"s":""} selected</span>
+                <button onClick={()=>setConfirmBulkDelete(true)} style={{marginLeft:4,background:"#ef4444",color:"#fff",border:"none",borderRadius:8,padding:"7px 18px",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:6}}>
+                  🗑️ Delete selected
+                </button>
+                <button onClick={()=>setSelectedTrades(new Set())} style={{background:"none",border:`1px solid ${C.border}`,color:C.muted,borderRadius:8,padding:"7px 14px",fontSize:14,cursor:"pointer",fontFamily:"inherit"}}>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:19,minWidth:1300}}>
+              <thead>
+                <tr style={{borderBottom:`1px solid ${C.border}`,background:C.panel}}>
+                  {/* Select all checkbox */}
+                  <th style={{padding:"16px 8px 16px 20px",width:36}}>
+                    <div onClick={toggleSelectAll} style={{width:20,height:20,borderRadius:5,border:`2px solid ${selectedTrades.size===filtered.length&&filtered.length>0?C.accent:C.border}`,background:selectedTrades.size===filtered.length&&filtered.length>0?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
+                      {selectedTrades.size===filtered.length&&filtered.length>0&&<span style={{fontSize:12,color:"#fff",fontWeight:900}}>✓</span>}
+                      {selectedTrades.size>0&&selectedTrades.size<filtered.length&&<span style={{fontSize:10,color:C.accent,fontWeight:900}}>—</span>}
+                    </div>
+                  </th>
+                  {[
+                    {h:T.thNum||"#",sf:"tradeN"},{h:T.thDate||"Date",sf:"date"},{h:T.thSymbol||"Symbol"},{h:T.thDir||"Dir."},{h:T.thLots||"Lots"},{h:T.thEntry||"Entry"},{h:T.thExit||"Exit"},{h:T.thStrategy||"Strategy"},{h:T.thGamma||"Gamma"},{h:T.thEntryD||"Entry$"},{h:T.thTargetD||"Target$"},{h:T.thStopD||"Stop$"},{h:"P1"},{h:"P2"},{h:T.thActualPnl||"Actual PnL",sf:"pnl"},{h:T.thPsych||"Psych"},{h:T.thStrat||"Strat?"},{h:"⭐",sf:"rating"},{h:""}
+                  ].map(({h,sf})=>(
+                    <th key={h} onClick={sf?()=>{if(sortField===sf)setSortDir(d=>d==="asc"?"desc":"asc");else{setSortField(sf);setSortDir("desc");}}:undefined} style={{padding:"16px 16px",textAlign:"left",fontSize:14,color:sf&&sortField===sf?C.accent:C.muted,fontWeight:700,whiteSpace:"nowrap",textTransform:"uppercase",letterSpacing:"0.05em",cursor:sf?"pointer":"default",userSelect:"none"}}>
+                      {h}{sf&&sortField===sf?(sortDir==="desc"?" ↓":" ↑"):""}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(t=>(
+                  <React.Fragment key={t._docId||t.id}>
+                    <tr className="tr-row" style={{borderBottom:`1px solid ${C.border}`,cursor:"pointer",background:selectedTrades.has(t._docId)?"#22C55E15":expandedRow===t._docId?C.card:"transparent",transition:"background 0.15s"}} onClick={()=>setExpandedRow(expandedRow===t._docId?null:t._docId)}>
+                      {/* Checkbox */}
+                      <td style={{padding:"18px 8px 18px 20px"}} onClick={e=>toggleSelect(t._docId,e)}>
+                        <div style={{width:20,height:20,borderRadius:5,border:`2px solid ${selectedTrades.has(t._docId)?C.accent:C.border}`,background:selectedTrades.has(t._docId)?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s",flexShrink:0}}>
+                          {selectedTrades.has(t._docId)&&<span style={{fontSize:12,color:"#fff",fontWeight:900}}>✓</span>}
+                        </div>
+                      </td>
+                      <td style={{padding:"18px 16px",color:C.muted,fontSize:19}}>#{t.tradeN}</td>
+                      <td style={{padding:"18px 16px",color:C.sub,fontSize:19}}>{t.date?.slice(5)?.replace("-","/")}</td>
+                      <td style={{padding:"18px 16px"}}><span style={{fontWeight:800,fontSize:21,color:C.accent}}>{t.symbol}</span></td>
+                      <td style={{padding:"18px 16px"}}><Tag color={t.direction==="Long"?C.green:C.red}>{t.direction==="Long"?"▲ Long":"▼ Short"}</Tag></td>
+                      <td style={{padding:"18px 16px",color:C.text,fontSize:19}}>{t.contracts}</td>
+                      <td style={{padding:"18px 16px",color:C.sub,fontSize:19}}>{t.entryHour}</td>
+                      <td style={{padding:"18px 16px",color:C.sub,fontSize:19}}>{t.exitHour}</td>
+                      <td style={{padding:"18px 16px"}}><Tag color={C.purple}>{t.strategy}</Tag></td>
+                      <td style={{padding:"9px 10px"}}>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:3}}>
+                          {(Array.isArray(t.gammaLevels)?t.gammaLevels:(t.gammaLevel?[t.gammaLevel]:[])).map(g=><Tag key={g} color={C.amber} small>{g}</Tag>)}
+                        </div>
+                      </td>
+                      <td style={{padding:"18px 16px",color:C.text,fontSize:19}}>{t.entryPrice}</td>
+                      <td style={{padding:"18px 16px",color:C.text,fontSize:19}}>{t.targetPrice}</td>
+                      <td style={{padding:"18px 16px",color:C.text,fontSize:19}}>{t.stopPrice}</td>
+                      <td style={{padding:"18px 16px"}}>
+                        {t.partialType&&t.partialType!=="None"?(
+                          <span style={{fontSize:13,color:t.partial1Hit==="Yes"?C.green:C.red,display:"flex",alignItems:"center",gap:3}}>
+                            <span>{t.partial1Hit==="Yes"?"✓":"✗"}</span>
+                            <span>{t.partial1Price||"—"}{t.partial1Contracts?` (${t.partial1Contracts})`:""}</span>
+                          </span>
+                        ):<span style={{color:C.muted}}>—</span>}
+                      </td>
+                      <td style={{padding:"18px 16px"}}>
+                        {t.partialType==="2 Partials"?(
+                          <span style={{fontSize:13,color:t.partial2Hit==="Yes"?C.green:C.red,display:"flex",alignItems:"center",gap:3}}>
+                            <span>{t.partial2Hit==="Yes"?"✓":"✗"}</span>
+                            <span>{t.partial2Price||"—"}{t.partial2Contracts?` (${t.partial2Contracts})`:""}</span>
+                          </span>
+                        ):<span style={{color:C.muted}}>—</span>}
+                      </td>
+                      <td style={{padding:"18px 16px"}}><span style={{fontSize:24,fontWeight:900,color:pnlColor(t.actualPnl),fontFamily:"'Barlow Condensed', sans-serif"}}>{fmt(t.actualPnl)}</span></td>
+                      <td style={{padding:"18px 16px"}}>
+                        <span style={{fontSize:16,color:C.sub,maxWidth:180,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.psychology}>
+                          {t.psychology||"—"}
+                        </span>
+                      </td>
+                      <td style={{padding:"18px 16px"}}><Tag color={t.strategyFollowed==="Yes"?C.green:C.red}>{t.strategyFollowed}</Tag></td>
+                      <td style={{padding:"14px 10px",whiteSpace:"nowrap"}}>
+                        {(t.tradeRating||0)>0
+                          ?<span style={{fontSize:15,letterSpacing:1,color:C.amber}}>{"★".repeat(t.tradeRating||0)}{"☆".repeat(5-(t.tradeRating||0))}</span>
+                          :<span style={{color:C.border,fontSize:15}}>☆☆☆☆☆</span>
+                        }
+                      </td>
+                      <td style={{padding:"13px 10px"}}>
+                        <div style={{display:"flex",gap:6}}>
+                          <button className="icon-btn" onClick={e=>{e.stopPropagation();handleEdit(t);}} style={{color:C.blue,fontSize:14}}>✏</button>
+                          <button className="icon-btn" onClick={e=>{e.stopPropagation();setConfirmDelete(t._docId);}} style={{color:C.red,fontSize:14}}>✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedRow===t._docId&&(
+                      <tr><td colSpan={19} style={{padding:"18px 20px",background:"#0d1424"}}>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:16}}>
+                          {[
+                            ["Partial Type",t.partialType||"None",C.text],
+                            ...(t.partialType&&t.partialType!=="None"?[["1st Partial Price",t.partial1Price||"—",C.text],["1st Partial Contracts",t.partial1Contracts||"—",C.text],["1st Partial Hit",t.partial1Hit,t.partial1Hit==="Yes"?C.green:C.red]]:[ ]),
+                            ...(t.partialType==="2 Partials"?[["2nd Partial Price",t.partial2Price||"—",C.text],["2nd Partial Contracts",t.partial2Contracts||"—",C.text],["2nd Partial Hit",t.partial2Hit,t.partial2Hit==="Yes"?C.green:C.red]]:[]),
+                            ["Final Target Price",t.finalTargetPrice||"—",C.text],
+                            ["Final Target Hit",t.finalTargetHit,t.finalTargetHit==="Yes"?C.green:C.red],
+                            ["Actual Final Level",t.actualFinalLevel||"—",C.text],
+                            ["Profit Target",t.profitTarget?fmt(t.profitTarget):"—",C.text],
+                            ["Actual PnL",fmt(t.actualPnl),pnlColor(t.actualPnl)],
+                            ["Strategy Followed",t.strategyFollowed,t.strategyFollowed==="Yes"?C.green:C.red],
+                            ["Psychology",t.psychology,C.text],
+                          ].map(([l,v,col])=>(
+                            <div key={l} style={{borderLeft:`2px solid ${C.border}`,paddingLeft:10}}>
+                              <div style={{...lS,marginBottom:3}}>{l}</div>
+                              <div style={{fontSize:15,color:col,fontWeight:col!==C.text?700:400}}>{v}</div>
+                            </div>
+                          ))}
+                          {(t.tradeRating||0)>0&&(
+                            <div style={{borderLeft:`2px solid ${C.amber}50`,paddingLeft:10}}>
+                              <div style={{...lS,marginBottom:3}}>{T.fTradeRating||"Avaliação do Trade"}</div>
+                              <div style={{fontSize:20,color:C.amber,letterSpacing:2}}>{"★".repeat(t.tradeRating)}{"☆".repeat(5-t.tradeRating)} <span style={{fontSize:13,fontWeight:700}}>{t.tradeRating}/5</span></div>
+                            </div>
+                          )}
+                          {t.comments&&(
+                            <div style={{gridColumn:"1/-1",borderLeft:`2px solid ${C.border}`,paddingLeft:10}}>
+                              <div style={{...lS,marginBottom:3}}>Comments</div>
+                              <div style={{fontSize:15,color:C.muted,fontStyle:"italic"}}>{t.comments}</div>
+                            </div>
+                          )}
+                        </div>
+                        {t.chartImage&&(
+                          <div style={{marginTop:12}}>
+                            <div style={{...lS,marginBottom:8}}>Trade Chart</div>
+                            <img src={t.chartImage} alt="Trade chart" style={{width:"100%",maxHeight:500,objectFit:"contain",borderRadius:4,border:`1px solid ${C.border}`,background:C.bg,display:"block"}}/>
+                          </div>
+                        )}
+                      </td></tr>
+                    )}
+                  </React.Fragment>
+                ))}
+                {filtered.length===0&&(
+                  <tr><td colSpan={19} style={{padding:60,textAlign:"center",color:C.muted,fontSize:18}}>No trades found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ANALYSIS */}
+        {tab==="analise" && (
+          <div style={{flex:1,overflowY:"auto",overflowX:"hidden"}}>
+          <div className="fade-in analysis-grid" style={{display:"grid",gap:10,padding:"0 0 10px 0"}}>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22}}>
+              <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:18}}>{T.perfByStrategy||"Performance by Strategy"}</div>
+              {stratStats.map(s=>(
+                <div key={s.strategy} style={{marginBottom:14}}>
+                  <div className="strat-row" style={{display:"flex",justifyContent:"space-between",marginBottom:5,gap:4,flexWrap:"wrap"}}>
+                    <span style={{fontSize:16,fontWeight:700,minWidth:0,flex:"1 1 auto"}}>{s.strategy}</span>
+                    <div className="strat-meta" style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                      <span className="strat-meta-text" style={{fontSize:15,color:C.muted,whiteSpace:"nowrap"}}>{(T&&T.tradeCount)?T.tradeCount(s.count):(s.count+" trades")} · {(s.wins/s.count*100).toFixed(0)}% WR</span>
+                      <span className="strat-pnl" style={{fontSize:18,fontWeight:800,color:s.pnl>=0?C.green:C.red,fontFamily:"'Barlow Condensed', sans-serif",whiteSpace:"nowrap"}}>{fmt(s.pnl)}</span>
+                    </div>
+                  </div>
+                  <div style={{height:3,background:C.border,borderRadius:1}}>
+                    <div style={{height:"100%",borderRadius:1,background:s.pnl>=0?C.green:C.red,width:`${Math.min(100,Math.abs(s.pnl)/Math.max(...stratStats.map(x=>Math.abs(x.pnl)),1)*100)}%`,transition:"width 0.6s",opacity:0.8}}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22}}>
+              <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:18}}>{T.resultDist||"Result Distribution"}</div>
+              <SimpleBarChart height={210} colorFn={(_,i)=>i>=3?C.green:C.red} data={(()=>{const labels=["<-300","-300~-100","-100~0","0~100","100~300","300~500","500+"];const counts=Array(7).fill(0);filtered.forEach(t=>{const r=t.actualPnl;if(r<-300)counts[0]++;else if(r<-100)counts[1]++;else if(r<0)counts[2]++;else if(r<100)counts[3]++;else if(r<300)counts[4]++;else if(r<500)counts[5]++;else counts[6]++;});return labels.map((l,i)=>({label:l,count:counts[i]}));})()}/>
+            </div>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22,gridColumn:"1/-1"}}>
+              <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:18}}>{T.gammaUsage||"Gamma Level Usage"}</div>
+              {gammaStats.length===0?<div style={{color:C.muted,fontSize:15,textAlign:"center",padding:"20px 0"}}>{T.noGammaData||"No gamma level data yet"}</div>:(
+                <div className="gamma-grid" style={{display:"grid",gap:8}}>
+                  {gammaStats.map(g=>(
+                    <div key={g.level} style={{background:C.panel,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.border}`}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                        <span style={{fontSize:15,color:C.amber,fontWeight:700}}>{g.level}</span>
+                        <span style={{fontSize:15,color:C.muted}}>{(T&&T.tradeCount)?T.tradeCount(g.count):(g.count+(g.count!==1?" trades":" trade"))}</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                        <span style={{fontSize:20,fontWeight:800,color:g.pnl>=0?C.green:C.red,fontFamily:"'Barlow Condensed', sans-serif"}}>{fmt(g.pnl)}</span>
+                        <span style={{fontSize:9,color:g.wins/g.count>=0.5?C.green:C.red}}>{(g.wins/g.count*100).toFixed(0)}% WR</span>
+                      </div>
+                      <div style={{height:2,background:C.border,borderRadius:1}}>
+                        <div style={{height:"100%",borderRadius:1,background:C.amber,opacity:0.7,width:`${Math.min(100,g.count/Math.max(...gammaStats.map(x=>x.count),1)*100)}%`}}/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22,gridColumn:"1/-1"}}>
+              <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:18}}>{T.statSummary||"Statistical Summary"}</div>
+              <div className="stat-summary-grid" style={{display:"grid",gap:8}}>
+                {[
+                  {label:T.expectancy||"Expectancy / Trade",value:fmt(filtered.length?metrics.totalPnl/filtered.length:0),color:C.text},
+                  {label:T.stratDiscipline||"Strategy Discipline",value:metrics.stratFollowedRate.toFixed(0)+"%",color:metrics.stratFollowedRate>=80?C.green:C.amber},
+                  {label:T.bestStrategy,value:metrics.bestStrategy,color:C.blue},
+                  {label:T.bestTrade||"Best Trade",value:fmt(Math.max(...filtered.map(t=>t.actualPnl),0)),color:C.green},
+                  {label:T.worstTrade||"Worst Trade",value:fmt(Math.min(...filtered.map(t=>t.actualPnl),0)),color:C.red},
+                ].map(s=>(
+                  <div key={s.label} style={{background:C.panel,borderRadius:3,padding:"12px 14px",border:`1px solid ${C.border}`}}>
+                    <div style={lS}>{s.label}</div>
+                    <div style={{fontFamily:"'Barlow Condensed', sans-serif",fontSize:18,color:s.color}}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          </div>
+        )}
+
+        {/* CALENDAR */}
+
+        {/* NEWS */}
+        {tab==="news" && (
+          <div style={{flex:1,overflowY:"auto"}} className="fade-in">
+            <NewsView theme={theme} C={C} T={T}/>
+          </div>
+        )}
+
+        {tab==="calendar" && (
+          <div style={{flex:1,overflowY:'auto'}} className="fade-in">
+            <CalendarView trades={filtered} C={C} T={T}/>
+          </div>
+        )}
+
+      </div>
+
+      {/* NEW / EDIT MODAL */}
+      {showForm&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,backdropFilter:"blur(6px)",padding:20}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:32,width:820,maxHeight:"94vh",overflowY:"auto",boxShadow:"0 25px 60px rgba(0,0,0,0.6)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:3,height:20,background:C.cyan}}/>
+                <span style={{fontSize:20,fontWeight:800}}>{editTrade?T.editTrade:T.newTrade}</span>
+              </div>
+              <button onClick={()=>{setShowForm(false);setEditTrade(null);}} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:20}}>✕</button>
+            </div>
+            <div className="form-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+              <SectionHeader title={T.secIdentification}/>
+              <FField label={T.fTradeN}>
+                <div style={{...iS,color:C.cyan,display:"flex",alignItems:"center",gap:6}}>
+                  <span style={{fontSize:10,color:C.muted}}>AUTO</span> #{form.tradeN}
+                </div>
+              </FField>
+              <FField label={T.fDate}><input type="date" value={form.date} onChange={e=>setF("date",e.target.value)} style={iS}/></FField>
+              <FField label={T.fSymbol}>
+                <select value={form.symbol} onChange={e=>setF("symbol",e.target.value)} style={iS}>
+                  <option value="">{T.fSelectSymbol}</option>
+                  {symbolsList.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </FField>
+
+              <SectionHeader title={T.secExecution}/>
+              <FField label={T.fDirection}><select value={form.direction} onChange={e=>setF("direction",e.target.value)} style={iS}>{DIRECTIONS.map(d=><option key={d}>{d}</option>)}</select></FField>
+              <FField label={T.fContracts}><input type="number" value={form.contracts} onChange={e=>setF("contracts",e.target.value)} style={iS} step="any"/></FField>
+              <FField label={T.fEntryHour}><input type="time" value={form.entryHour} onChange={e=>setF("entryHour",e.target.value)} style={iS}/></FField>
+              <FField label={T.fExitHour}><input type="time" value={form.exitHour} onChange={e=>setF("exitHour",e.target.value)} style={iS}/></FField>
+              <FField label={T.fStrategy}>
+                <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  <select value={form.strategy} onChange={e=>{if(e.target.value==="__new__"){setShowNewStrategy(true);}else{setF("strategy",e.target.value);setShowNewStrategy(false);}}} style={iS}>
+                    <option value="">{T.fSelectStrategy}</option>
+                    {strategies.map(s=><option key={s} value={s}>{s}</option>)}
+                    <option value="__new__">{T.fCreateStrategy}</option>
+                  </select>
+                  {showNewStrategy&&(
+                    <div style={{display:"flex",gap:6}}>
+                      <input type="text" value={newStrategyInput} onChange={e=>setNewStrategyInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addStrategy()} placeholder={T.fStrategyName} style={{...iS,flex:1}} autoFocus/>
+                      <button onClick={addStrategy} style={{background:C.cyan,color:"#000",border:"none",borderRadius:3,padding:"0 14px",fontWeight:700,cursor:"pointer",fontSize:11,whiteSpace:"nowrap",fontFamily:"inherit"}}>ADD</button>
+                      <button onClick={()=>{setShowNewStrategy(false);setNewStrategyInput("");}} style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:"0 10px",cursor:"pointer",fontSize:11}}>✕</button>
+                    </div>
+                  )}
+                </div>
+              </FField>
+
+              <FField label={T.fGammaLevels} span={3}>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {GAMMA_LEVELS.map(g=>{
+                    const selected=(form.gammaLevels||[]).includes(g);
+                    return <button key={g} type="button" onClick={()=>{const cur=form.gammaLevels||[];setF("gammaLevels",selected?cur.filter(x=>x!==g):[...cur,g]);}} style={{padding:"5px 10px",borderRadius:2,fontSize:10,fontWeight:700,border:`1px solid ${selected?C.amber:C.border}`,color:selected?C.amber:C.muted,background:selected?`${C.amber}12`:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s",letterSpacing:"0.05em"}}>{selected?"✓ ":""}{g}</button>;
+                  })}
+                </div>
+              </FField>
+
+              <SectionHeader title={T.secPriceLevels}/>
+              <FField label={T.fEntryPrice}><input type="number" value={form.entryPrice} onChange={e=>setF("entryPrice",e.target.value)} style={iS} step="any"/></FField>
+              <FField label={T.fTargetPrice}><input type="number" value={form.targetPrice} onChange={e=>setF("targetPrice",e.target.value)} style={iS} step="any"/></FField>
+              <FField label={T.fStopPrice}><input type="number" value={form.stopPrice} onChange={e=>setF("stopPrice",e.target.value)} style={iS} step="any"/></FField>
+
+              <SectionHeader title={T.secPartials}/>
+              <FField label={T.fPartialType} span={3}>
+                <div style={{display:"flex",gap:8}}>
+                  {["None","1 Partial","2 Partials"].map(opt=>(
+                    <button key={opt} type="button" onClick={()=>setF("partialType",opt)} style={{flex:1,padding:"9px 4px",borderRadius:3,fontSize:10,fontWeight:700,border:`1px solid ${form.partialType===opt?C.cyan:C.border}`,color:form.partialType===opt?C.cyan:C.muted,background:form.partialType===opt?`${C.cyan}10`:"transparent",cursor:"pointer",fontFamily:"inherit",letterSpacing:"0.06em",transition:"all 0.15s"}}>{opt}</button>
+                  ))}
+                </div>
+              </FField>
+              {(form.partialType==="1 Partial"||form.partialType==="2 Partials")&&(<>
+                <FField label={T.fP1Price}><input type="number" value={form.partial1Price} onChange={e=>setF("partial1Price",e.target.value)} style={iS} step="any"/></FField>
+                <FField label={T.fP1Contracts}><input type="number" value={form.partial1Contracts} onChange={e=>setF("partial1Contracts",e.target.value)} style={iS} step="any"/></FField>
+                <FField label={T.fP1Hit}><select value={form.partial1Hit} onChange={e=>setF("partial1Hit",e.target.value)} style={iS}>{YES_NO.map(v=><option key={v}>{v}</option>)}</select></FField>
+              </>)}
+              {form.partialType==="2 Partials"&&(<>
+                <FField label={T.fP2Price}><input type="number" value={form.partial2Price} onChange={e=>setF("partial2Price",e.target.value)} style={iS} step="any"/></FField>
+                <FField label={T.fP2Contracts}><input type="number" value={form.partial2Contracts} onChange={e=>setF("partial2Contracts",e.target.value)} style={iS} step="any"/></FField>
+                <FField label={T.fP2Hit}><select value={form.partial2Hit} onChange={e=>setF("partial2Hit",e.target.value)} style={iS}>{YES_NO.map(v=><option key={v}>{v}</option>)}</select></FField>
+              </>)}
+
+              <SectionHeader title={T.secFinalTarget}/>
+              <FField label={T.fFinalTargetPrice}><input type="number" value={form.finalTargetPrice} onChange={e=>setF("finalTargetPrice",e.target.value)} style={iS} step="any"/></FField>
+              <FField label={T.fFinalTargetHit}><select value={form.finalTargetHit} onChange={e=>setF("finalTargetHit",e.target.value)} style={iS}>{YES_NO.map(v=><option key={v}>{v}</option>)}</select></FField>
+              <FField label={T.fActualFinalLevel}><input type="text" value={form.actualFinalLevel} onChange={e=>setF("actualFinalLevel",e.target.value)} style={iS}/></FField>
+              <FField label={T.fProfitTarget}><input type="number" value={form.profitTarget} onChange={e=>setF("profitTarget",e.target.value)} style={iS} step="any"/></FField>
+              <FField label={T.fActualPnl}><input type="number" value={form.actualPnl} onChange={e=>setF("actualPnl",e.target.value)} style={{...iS,color:pnlColor(form.actualPnl),fontWeight:700}} step="any"/></FField>
+              <div/>
+
+              <SectionHeader title={T.secReview}/>
+              <FField label={T.fStrategyFollowed}><select value={form.strategyFollowed} onChange={e=>setF("strategyFollowed",e.target.value)} style={iS}>{STRATEGY_FOLLOWED.map(v=><option key={v}>{v}</option>)}</select></FField>
+              <FField label={T.fStopRespected||"Stop Respeitado"}>
+                <div style={{display:"flex",gap:8,paddingTop:2}}>
+                  {["Yes","No"].map(v=>(
+                    <button key={v} type="button" onClick={()=>setF("stopRespected",v)}
+                      style={{flex:1,padding:"10px",borderRadius:10,fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer",border:`1px solid ${form.stopRespected===v?(v==="Yes"?C.green:C.red):C.border}`,color:form.stopRespected===v?"#fff":C.muted,background:form.stopRespected===v?(v==="Yes"?C.green:C.red):"none",transition:"all 0.15s"}}>
+                      {v==="Yes"?"✓ Sim":"✗ Não"}
+                    </button>
+                  ))}
+                </div>
+              </FField>
+              <FField label={T.fTradeRating||"Avaliação do Trade"} span={2}>
+                <div style={{display:"flex",gap:6,alignItems:"center",paddingTop:4}}>
+                  {[1,2,3,4,5].map(n=>(
+                    <button key={n} type="button" onClick={()=>setF("tradeRating",form.tradeRating===n?0:n)}
+                      style={{fontSize:26,background:"none",border:"none",cursor:"pointer",padding:"2px 4px",
+                        color:n<=(form.tradeRating||0)?C.amber:C.border,
+                        transform:n<=(form.tradeRating||0)?"scale(1.15)":"scale(1)",
+                        transition:"all 0.15s",lineHeight:1}}>★</button>
+                  ))}
+                  {(form.tradeRating||0)>0&&<span style={{fontSize:13,color:C.amber,fontWeight:700,marginLeft:4}}>{form.tradeRating}/5</span>}
+                </div>
+                <div style={{fontSize:11,color:C.muted,marginTop:4}}>{T.fTradeRatingHint||"Como você avalia a execução deste trade?"}</div>
+              </FField>
+              <div/>
+              <FField label={T.fPsychology} span={3}><textarea value={form.psychology} onChange={e=>setF("psychology",e.target.value)} style={{...iS,height:80,resize:"vertical",lineHeight:1.5,fontFamily:"inherit",fontSize:14}} placeholder={T.fPsychPlaceholder}/></FField>
+              <div/>
+
+              <SectionHeader title={T.secChart}/>
+              <div style={{gridColumn:"1/-1"}}>
+                {form.chartImage?(
+                  <div style={{position:"relative"}}>
+                    <img src={form.chartImage} alt="Trade chart" style={{width:"100%",maxHeight:280,objectFit:"contain",borderRadius:4,border:`1px solid ${C.border}`,background:C.bg}}/>
+                    <button onClick={()=>setF("chartImage","")} style={{position:"absolute",top:8,right:8,background:`${C.red}cc`,border:"none",borderRadius:3,color:"#fff",cursor:"pointer",padding:"4px 10px",fontSize:10,fontFamily:"inherit"}}>{T.fRemove}</button>
+                  </div>
+                ):(
+                  <label style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,border:`1px dashed ${C.borderHi}`,borderRadius:4,padding:"28px 20px",cursor:"pointer",background:C.panel}}
+                    onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.cyan;}}
+                    onDragLeave={e=>{e.currentTarget.style.borderColor=C.borderHi;}}
+                    onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor=C.borderHi;const file=e.dataTransfer.files[0];if(file&&file.type.startsWith("image/")){const r=new FileReader();r.onload=ev=>setF("chartImage",ev.target.result);r.readAsDataURL(file);}}}>
+                    <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const file=e.target.files[0];if(file){const r=new FileReader();r.onload=ev=>setF("chartImage",ev.target.result);r.readAsDataURL(file);}}}/>
+                    <div style={{fontSize:24}}>📈</div>
+                    <div style={{fontSize:11,color:C.muted}}>{T.fDropChart} <span style={{color:C.cyan}}>{T.fClickUpload}</span></div>
+                    <div style={{fontSize:9,color:C.muted,letterSpacing:"0.08em"}}>PNG · JPG · WEBP</div>
+                  </label>
+                )}
+              </div>
+              <div style={{gridColumn:"1/-1"}}>
+                <label style={lS}>{T.fComments}</label>
+                <textarea value={form.comments} onChange={e=>setF("comments",e.target.value)} style={{...iS,height:72,resize:"none"}}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:24}}>
+              <button onClick={handleSave} disabled={saving} style={{flex:1,background:saving?C.border:`linear-gradient(135deg,${C.accent},${C.purple})`,color:"#fff",border:"none",borderRadius:12,padding:"14px",fontFamily:"inherit",fontWeight:700,cursor:saving?"not-allowed":"pointer",fontSize:14}}>
+                {saving?T.saving:T.saveTrade}
+              </button>
+              <button onClick={()=>{setShowForm(false);setEditTrade(null);}} style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:"14px",fontFamily:"inherit",cursor:"pointer",fontSize:14}}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MANAGE MODAL */}
+      {showManage&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(6px)",padding:20}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,padding:32,width:540,maxHeight:"80vh",overflowY:"auto",boxShadow:"0 25px 60px rgba(0,0,0,0.6)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:3,height:20,background:C.cyan}}/>
+                <span style={{fontSize:20,fontWeight:800}}>{T.manageLists}</span>
+              </div>
+              <button onClick={()=>setShowManage(false)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:20}}>✕</button>
+            </div>
+            <div style={{marginBottom:28}}>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:14}}>{T.mSymbols}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
+                {symbolsList.map(s=>(
+                  <div key={s} style={{display:"flex",alignItems:"center",gap:6,background:C.panel,border:`1px solid ${C.border}`,borderRadius:3,padding:"5px 10px"}}>
+                    <span style={{fontSize:11,fontWeight:700,color:C.cyan}}>{s}</span>
+                    <button onClick={()=>saveSymbols(symbolsList.filter(x=>x!==s))} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:13,lineHeight:1,padding:0}}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input type="text" value={newSymbolInput} onChange={e=>setNewSymbolInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&addSymbol()} placeholder={T.mSymbolPlaceholder} style={{...iS,flex:1}}/>
+                <button onClick={addSymbol} style={{background:C.cyan,color:"#000",border:"none",borderRadius:3,padding:"0 16px",fontWeight:700,cursor:"pointer",fontSize:10,whiteSpace:"nowrap",fontFamily:"inherit"}}>{T.mAdd}</button>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:C.text,marginBottom:14}}>{T.mStrategies}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:12}}>
+                {strategies.map(s=>(
+                  <div key={s} style={{display:"flex",alignItems:"center",gap:6,background:C.panel,border:`1px solid ${C.border}`,borderRadius:3,padding:"5px 10px"}}>
+                    <span style={{fontSize:11,color:C.text}}>{s}</span>
+                    <button onClick={()=>saveStrategies(strategies.filter(x=>x!==s))} style={{background:"none",border:"none",color:C.red,cursor:"pointer",fontSize:13,lineHeight:1,padding:0}}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <input type="text" value={newStrategyInput} onChange={e=>setNewStrategyInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){const n=newStrategyInput.trim();if(n&&!strategies.includes(n)){saveStrategies([...strategies,n]);setNewStrategyInput("");}}}} placeholder={T.mStrategyPlaceholder} style={{...iS,flex:1}}/>
+                <button onClick={()=>{const n=newStrategyInput.trim();if(n&&!strategies.includes(n)){saveStrategies([...strategies,n]);setNewStrategyInput("");}}} style={{background:C.purple,color:"#fff",border:"none",borderRadius:3,padding:"0 16px",fontWeight:700,cursor:"pointer",fontSize:10,whiteSpace:"nowrap",fontFamily:"inherit"}}>{T.mAdd}</button>
+              </div>
+            </div>
+            <button onClick={()=>setShowManage(false)} style={{marginTop:24,width:"100%",background:"none",border:`1px solid ${C.border}`,color:C.muted,borderRadius:3,padding:10,cursor:"pointer",fontFamily:"inherit",fontSize:10,letterSpacing:"0.08em"}}>{T.mClose}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ACCOUNT MODAL */}
+      {showAccount&&(
+        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername}/>
+      )}
+
+      {/* CONFIRM DELETE */}
+      {confirmDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(6px)"}}>
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:32,width:360,textAlign:"center",boxShadow:"0 25px 60px rgba(0,0,0,0.6)"}}>
+            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>{T.deleteTrade}</div>
+            <div style={{fontSize:14,color:C.muted,marginBottom:24}}>{T.deleteCannotUndo}</div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={confirmDeleteTrade} style={{flex:1,background:C.red,color:"#fff",border:"none",borderRadius:3,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:11,letterSpacing:"0.08em"}}>{T.deleteConfirm}</button>
+              <button onClick={()=>setConfirmDelete(null)} style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:3,padding:"11px",fontFamily:"inherit",cursor:"pointer",fontSize:11}}>{T.deleteCancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM BULK DELETE */}
+      {confirmBulkDelete&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,backdropFilter:"blur(8px)"}}>
+          <div style={{background:C.card,border:`1px solid #ef444440`,borderRadius:20,padding:36,width:400,textAlign:"center",boxShadow:"0 25px 60px rgba(0,0,0,0.7)"}}>
+            <div style={{fontSize:40,marginBottom:12}}>🗑️</div>
+            <div style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Delete {selectedTrades.size} trades?</div>
+            <div style={{fontSize:15,color:C.muted,marginBottom:28,lineHeight:1.5}}>This will permanently delete <span style={{color:C.red,fontWeight:700}}>{selectedTrades.size} trade{selectedTrades.size!==1?"s":""}</span>. This action cannot be undone.</div>
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={bulkDelete} style={{flex:1,background:"linear-gradient(135deg,#ef4444,#dc2626)",color:"#fff",border:"none",borderRadius:10,padding:"13px",fontFamily:"inherit",fontWeight:800,cursor:"pointer",fontSize:15,letterSpacing:"0.03em"}}>
+                Yes, delete all
+              </button>
+              <button onClick={()=>setConfirmBulkDelete(false)} style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:10,padding:"13px",fontFamily:"inherit",cursor:"pointer",fontSize:15}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<ErrorBoundary><App/></ErrorBoundary>);
+</script>
+</body>
+</html>
