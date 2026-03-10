@@ -1288,7 +1288,7 @@ function PsychologyAI({trades, C, lang}){
   );
 }
 
-function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername, userPlan, subscriptionId, planExpiry, onPlanChange}){
+function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername, userPlan, subscriptionId, planExpiry, onPlanChange, pendingPlan}){
   const labels = {
     pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança", planTab:"Plano",
       name:"Nome de exibição", email:"Email", newEmail:"Novo email",
@@ -1335,7 +1335,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
   };
   const L = labels[lang]||labels.en;
 
-  const [tab, setTab]             = React.useState("profile");
+  const [tab, setTab]             = React.useState((pendingPlan==="pro"||pendingPlan==="premium")?"plan":"profile");
   const [displayName, setDisplayName] = React.useState(currentUser?.displayName||"");
   const [newEmail, setNewEmail]   = React.useState("");
   const [currentPwd, setCurrentPwd] = React.useState("");
@@ -1345,7 +1345,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
   const [photoUploading, setPhotoUploading] = React.useState(false);
   const [photoURL, setPhotoURL]   = React.useState(userPhotoURL||null);
   // Plan/Stripe state
-  const [selectedPlan, setSelectedPlan] = React.useState(null); // "pro"|"premium"
+  const [selectedPlan, setSelectedPlan] = React.useState((pendingPlan==="pro"||pendingPlan==="premium")?pendingPlan:null);
   const [cardReady, setCardReady]   = React.useState(false);
   const [stripeObj, setStripeObj]   = React.useState(null);
   const [cardElement, setCardElement] = React.useState(null);
@@ -1807,6 +1807,7 @@ function App(){
   const [showManage,setShowManage]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
   const [showUpgradeModal,setShowUpgradeModal]=useState(false);
+  const [pendingPlan]=useState(()=>new URLSearchParams(window.location.search).get("plan")); // "pro"|"premium"|null
   const [userPhotoURL,setUserPhotoURL]=useState(null);
   const [userUsername,setUserUsername]=useState("");
   const [newSymbolInput,setNewSymbolInput]=useState("");
@@ -2066,6 +2067,10 @@ function App(){
             setUserPlan(d.plan||"free");
             setSubscriptionId(d.subscriptionId||null);
             setPlanExpiry(d.currentPeriodEnd||null);
+            // If came from landing page with ?plan=pro/premium, open account modal on plan tab
+            if(pendingPlan==="pro"||pendingPlan==="premium"){
+              if(d.plan==="free") setTimeout(()=>setShowAccount(true), 800);
+            }
           }).catch(()=>{});
         }
         else{ setCurrentUser(null); setLoggedIn(false); setTrades([]); setUserPhotoURL(null); setUserUsername(""); }
@@ -3186,7 +3191,7 @@ function App(){
 
       {/* ACCOUNT MODAL */}
       {showAccount&&(
-        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername} userPlan={userPlan} subscriptionId={subscriptionId} planExpiry={planExpiry} onPlanChange={(plan,subId)=>{setUserPlan(plan);setSubscriptionId(subId||null);}}/>
+        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername} userPlan={userPlan} subscriptionId={subscriptionId} planExpiry={planExpiry} onPlanChange={(plan,subId)=>{setUserPlan(plan);setSubscriptionId(subId||null);}} pendingPlan={pendingPlan}/>
       )}
 
       {/* UPGRADE MODAL - free tier limit reached */}
