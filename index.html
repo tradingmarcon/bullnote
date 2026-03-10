@@ -31,8 +31,49 @@ body::before{
 }
 
 /* ── NAVBAR ── */
+/* ── TOP BANNER ── */
+.top-banner{
+  position:fixed; top:0; left:0; right:0; z-index:101;
+  height:40px; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(90deg, #16A34A, #22C55E, #10B981, #22C55E, #16A34A);
+  background-size:300% 100%;
+  animation:bannerShift 6s linear infinite;
+  font-size:13px; font-weight:700; color:#000;
+  letter-spacing:.04em; gap:10px; cursor:pointer;
+  overflow:hidden;
+}
+.top-banner::before{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent 0%, #ffffff18 50%, transparent 100%);
+  animation:bannerShine 3s ease-in-out infinite;
+}
+@keyframes bannerShift{
+  0%{background-position:0% 50%}
+  100%{background-position:300% 50%}
+}
+@keyframes bannerShine{
+  0%{transform:translateX(-100%)}
+  100%{transform:translateX(100%)}
+}
+.banner-pill{
+  background:#00000020; border-radius:100px;
+  padding:2px 10px; font-size:11px; font-weight:800;
+  letter-spacing:.08em; text-transform:uppercase;
+}
+.banner-arrow{
+  display:inline-flex; align-items:center; justify-content:center;
+  background:#00000025; border-radius:50%; width:18px; height:18px;
+  font-size:10px; font-weight:900;
+}
+.top-banner-close{
+  position:absolute; right:16px; background:none; border:none;
+  color:#00000060; font-size:16px; cursor:pointer; line-height:1;
+  padding:4px; transition:color .15s;
+}
+.top-banner-close:hover{color:#000}
+
 nav{
-  position:fixed; top:0; left:0; right:0; z-index:100;
+  position:fixed; top:40px; left:0; right:0; z-index:100;
   display:flex; align-items:center; justify-content:space-between;
   padding:0 40px; height:96px;
   background:rgba(15,23,42,.85); backdrop-filter:blur(20px);
@@ -80,7 +121,7 @@ nav{
 /* ── HERO ── */
 .hero{
   min-height:100vh; display:flex; align-items:center; justify-content:center;
-  text-align:center; padding:120px 24px 80px; position:relative; overflow:hidden;
+  text-align:center; padding:160px 24px 80px; position:relative; overflow:hidden;
 }
 .hero-glow{
   position:absolute; width:800px; height:800px; border-radius:50%;
@@ -100,6 +141,11 @@ nav{
 .particle{
   position:absolute; border-radius:50%; pointer-events:none;
   animation:float linear infinite;
+}
+/* candlestick canvas */
+#candleCanvas{
+  position:absolute; inset:0; width:100%; height:100%;
+  pointer-events:none; opacity:.13;
 }
 @keyframes float{
   0%{transform:translateY(0) rotate(0deg); opacity:0}
@@ -469,6 +515,12 @@ footer{
 </head>
 <body>
 
+<div class="top-banner" id="topBanner" onclick="document.getElementById('pricing').scrollIntoView({behavior:'smooth'})">
+  <span class="banner-pill">FREE</span>
+  <span id="bannerText">🎉 Start for free — 15 trades/month, no credit card needed. See plans →</span>
+  <button class="top-banner-close" onclick="event.stopPropagation();closeBanner()">✕</button>
+</div>
+
 <!-- ══ NAVBAR ══ -->
 <nav id="navbar">
   <a class="nav-logo" href="#">
@@ -491,6 +543,7 @@ footer{
 <section class="hero">
   <div class="hero-glow"></div>
   <div class="hero-grid"></div>
+  <canvas id="candleCanvas"></canvas>
   <div id="particles"></div>
   <div style="position:relative;z-index:1;width:100%">
     <div class="hero-badge"><div class="badge-dot"></div><span data-t="heroBadge">Now with AI Psychology Analysis</span></div>
@@ -582,6 +635,12 @@ footer{
         <div class="feature-icon" style="background:#22C55E15">🌍</div>
         <h3 data-t="f8Title">Multi-Language</h3>
         <p data-t="f8Desc">Full support for English, Portuguese (BR) and Spanish. Switch language instantly — your data stays the same, the interface adapts.</p>
+      </div>
+
+      <div class="feature-card reveal" style="animation-delay:.45s">
+        <div class="feature-icon" style="background:#6366f115">📋</div>
+        <h3 data-t="f9Title">Weekly Report</h3>
+        <p data-t="f9Desc">Automatic weekly summary with your best and worst days, top strategies, discipline score trend and key takeaways — so you always know where to improve.</p>
       </div>
 
     </div>
@@ -881,6 +940,95 @@ footer{
 </footer>
 
 <script>
+// ── TOP BANNER ──
+function closeBanner(){
+  const b = document.getElementById('topBanner');
+  b.style.transition='height .3s ease, opacity .3s ease';
+  b.style.height='0'; b.style.opacity='0';
+  document.querySelector('nav').style.top='0';
+  setTimeout(()=>b.remove(), 300);
+}
+
+// ── CANDLESTICK BACKGROUND ──
+(function(){
+  const canvas = document.getElementById('candleCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const GREEN = '#22C55E', RED = '#EF4444';
+
+  let candles = [];
+  const CANDLE_W = 18, GAP = 10, TOTAL = CANDLE_W + GAP;
+
+  function resize(){
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+  }
+
+  function genCandle(x, prevClose){
+    const isUp = Math.random() > 0.42;
+    const bodyH = Math.random() * 80 + 20;
+    const open = prevClose || Math.random() * (canvas.height * 0.4) + canvas.height * 0.2;
+    const close = isUp ? open - bodyH : open + bodyH;
+    const wickTop = Math.random() * 30;
+    const wickBot = Math.random() * 30;
+    return { x, open, close, isUp,
+      high: Math.min(open, close) - wickTop,
+      low:  Math.max(open, close) + wickBot,
+      alpha: 0
+    };
+  }
+
+  function initCandles(){
+    candles = [];
+    const count = Math.ceil(canvas.width / TOTAL) + 2;
+    let prev = null;
+    for(let i = 0; i < count; i++){
+      const c = genCandle(i * TOTAL + 20, prev);
+      prev = c.close;
+      candles.push(c);
+    }
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    candles.forEach(c => {
+      if(c.alpha < 1) c.alpha = Math.min(1, c.alpha + 0.015);
+      const color = c.isUp ? GREEN : RED;
+      ctx.globalAlpha = c.alpha;
+      // wick
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(c.x + CANDLE_W/2, c.high);
+      ctx.lineTo(c.x + CANDLE_W/2, c.low);
+      ctx.stroke();
+      // body
+      ctx.fillStyle = color;
+      const top = Math.min(c.open, c.close);
+      const h = Math.abs(c.open - c.close);
+      ctx.fillRect(c.x, top, CANDLE_W, Math.max(h, 2));
+    });
+    ctx.globalAlpha = 1;
+
+    // scroll left
+    candles.forEach(c => c.x -= 0.4);
+
+    // remove off-screen, add new on right
+    if(candles[0].x + CANDLE_W < 0){
+      candles.shift();
+      const last = candles[candles.length - 1];
+      candles.push(genCandle(last.x + TOTAL, last.close));
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  resize();
+  initCandles();
+  draw();
+  window.addEventListener('resize', ()=>{ resize(); initCandles(); });
+})();
+
 // ── PARTICLES ──
 const pc = document.getElementById('particles');
 for(let i=0;i<18;i++){
@@ -896,7 +1044,13 @@ const obs = new IntersectionObserver(entries=>{ entries.forEach(e=>{ if(e.isInte
 document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 
 // ── NAVBAR SCROLL ──
-window.addEventListener('scroll',()=>{ document.getElementById('navbar').style.background=window.scrollY>20?'rgba(15,23,42,.97)':'rgba(15,23,42,.85)'; });
+window.addEventListener('scroll',()=>{
+  const banner = document.getElementById('topBanner');
+  const bannerH = banner ? banner.offsetHeight : 0;
+  const nav = document.getElementById('navbar');
+  nav.style.background = window.scrollY>20 ? 'rgba(15,23,42,.97)' : 'rgba(15,23,42,.85)';
+  nav.style.top = window.scrollY > bannerH ? '0' : (bannerH - window.scrollY) + 'px';
+});
 
 // ── FAQ ──
 function toggleFaq(btn){ const item=btn.parentElement; item.classList.toggle('open'); }
@@ -925,6 +1079,7 @@ function setBilling(mode){
 const T = {
   en:{
     navFeatures:'Features', navPricing:'Pricing', navFaq:'FAQ', navCta:'Get Started →',
+    bannerText:'🎉 Start for free — 15 trades/month, no credit card needed. See plans →',
     heroBadge:'Now with AI Psychology Analysis',
     heroTitle:'Trade Smarter.<br/><span class="green">Grow Faster.</span><br/><span class="dim">Stay Disciplined.</span>',
     heroSub:'The professional trading journal that transforms raw trade data into actionable insights — with AI-powered psychology analysis and discipline scoring.',
@@ -940,6 +1095,7 @@ const T = {
     f6Title:'Strategy Analysis', f6Desc:'Deep breakdown by strategy: win rate, profit factor, average trade. Know which setups make you money and which ones don\'t.',
     f7Title:'AI Psychology Analysis', f7Desc:'AI reads your psychology notes and generates personalized insights about your emotional patterns, biases and mental edge. <em style="color:var(--accent)">Premium only.</em>',
     f8Title:'Multi-Language', f8Desc:'Full support for English, Portuguese (BR) and Spanish. Switch language instantly — your data stays the same.',
+    f9Title:'Weekly Report', f9Desc:'Automatic weekly summary with your best and worst days, top strategies, discipline score trend and key takeaways — so you always know where to improve.',
     featPremium:'Core Feature', featAI:'Premium AI',
     prevLabel:'Dashboard', prevTitle:'Your entire trading performance, at a glance',
     prevDesc:'Stop guessing what\'s working. BullNote gives you the full picture — every metric, every pattern, every edge.',
@@ -986,6 +1142,7 @@ const T = {
   },
   pt:{
     navFeatures:'Funcionalidades', navPricing:'Preços', navFaq:'FAQ', navCta:'Começar →',
+    bannerText:'🎉 Comece de graça — 15 trades/mês, sem cartão de crédito. Ver planos →',
     heroBadge:'Agora com Análise Psicológica por IA',
     heroTitle:'Trade com Inteligência.<br/><span class="green">Cresça Mais Rápido.</span><br/><span class="dim">Mantenha a Disciplina.</span>',
     heroSub:'O diário de trades profissional que transforma dados brutos em insights acionáveis — com análise psicológica por IA e score de disciplina.',
@@ -1001,6 +1158,7 @@ const T = {
     f6Title:'Análise por Estratégia', f6Desc:'Análise profunda por estratégia: taxa de acerto, fator de lucro, média por trade. Saiba quais setups realmente geram dinheiro.',
     f7Title:'Análise Psicológica por IA', f7Desc:'A IA lê suas notas psicológicas e gera insights personalizados sobre seus padrões emocionais, vieses e vantagem mental. <em style="color:var(--accent)">Apenas Premium.</em>',
     f8Title:'Multi-Idioma', f8Desc:'Suporte completo para Inglês, Português (BR) e Espanhol. Troque o idioma na hora — seus dados ficam intactos.',
+    f9Title:'Relatório Semanal', f9Desc:'Resumo semanal automático com seus melhores e piores dias, top estratégias, evolução do Score de Disciplina e principais aprendizados — para você sempre saber onde melhorar.',
     featPremium:'Feature Principal', featAI:'IA Premium',
     prevLabel:'Dashboard', prevTitle:'Toda sua performance, em um só lugar',
     prevDesc:'Pare de adivinhar o que está funcionando. BullNote te dá o quadro completo — cada métrica, cada padrão, cada vantagem.',
@@ -1047,6 +1205,7 @@ const T = {
   },
   es:{
     navFeatures:'Funciones', navPricing:'Precios', navFaq:'FAQ', navCta:'Comenzar →',
+    bannerText:'🎉 Empieza gratis — 15 trades/mes, sin tarjeta de crédito. Ver planes →',
     heroBadge:'Ahora con Análisis Psicológico por IA',
     heroTitle:'Opera con Inteligencia.<br/><span class="green">Crece Más Rápido.</span><br/><span class="dim">Mantén la Disciplina.</span>',
     heroSub:'El diario de trading profesional que transforma datos en insights accionables — con análisis psicológico por IA y puntuación de disciplina.',
@@ -1062,6 +1221,7 @@ const T = {
     f6Title:'Análisis por Estrategia', f6Desc:'Análisis profundo por estrategia: tasa de acierto, factor de beneficio, media por operación.',
     f7Title:'Análisis Psicológico por IA', f7Desc:'La IA lee tus notas psicológicas y genera insights personalizados sobre tus patrones emocionales y ventaja mental. <em style="color:var(--accent)">Solo Premium.</em>',
     f8Title:'Multi-Idioma', f8Desc:'Soporte completo para Inglés, Portugués (BR) y Español. Cambia el idioma al instante.',
+    f9Title:'Informe Semanal', f9Desc:'Resumen semanal automático con tus mejores y peores días, estrategias top, evolución del Score de Disciplina y aprendizajes clave — para que siempre sepas dónde mejorar.',
     featPremium:'Función Principal', featAI:'IA Premium',
     prevLabel:'Dashboard', prevTitle:'Todo tu rendimiento, de un vistazo',
     prevDesc:'Deja de adivinar qué funciona. BullNote te da el panorama completo — cada métrica, cada patrón, cada ventaja.',
@@ -1108,6 +1268,12 @@ const T = {
   }
 };
 
+const bannerText = {
+  en: '🎉 Start for free — 15 trades/month, no credit card needed. See plans →',
+  pt: '🎉 Comece de graça — 15 trades/mês, sem cartão de crédito. Ver planos →',
+  es: '🎉 Empieza gratis — 15 trades/mes, sin tarjeta de crédito. Ver planes →',
+};
+
 let lang = 'en';
 function setLang(l){
   lang = l;
@@ -1116,7 +1282,9 @@ function setLang(l){
     const key = el.getAttribute('data-t');
     if(T[l][key] !== undefined) el.innerHTML = T[l][key];
   });
-  // update billing label
+  // update banner text
+  const bannerEl = document.getElementById('bannerText');
+  if(bannerEl) bannerEl.textContent = bannerText[l];
   setBilling(document.getElementById('btnMonthly').classList.contains('active')?'monthly':'annual');
 }
 
