@@ -842,7 +842,8 @@ function CalendarView({trades, C, T}){
 const logo = "image1.jpg";
 
 function LoginScreen({onLogin}){
-  const [mode,setMode]      = React.useState("login"); 
+  const urlPlan = new URLSearchParams(window.location.search).get("plan"); // "pro"|"premium"|null
+  const [mode,setMode]      = React.useState(urlPlan?"register":"login"); 
   const [email,setEmail]    = React.useState("");
   const [pw,setPw]          = React.useState("");
   const [pw2,setPw2]        = React.useState("");
@@ -852,6 +853,54 @@ function LoginScreen({onLogin}){
   const [show,setShow]      = React.useState(false);
   const [loginTheme,setLoginTheme] = React.useState(()=>localStorage.getItem("tj_theme")||"dark");
   const LC = loginTheme==="dark"?DARK:LIGHT;
+  // Payment step after register
+  const [payStep, setPayStep]         = React.useState(false);
+  const [payUser, setPayUser]         = React.useState(null); // firebase user after register
+  const [payPlan, setPayPlan]         = React.useState(urlPlan||null);
+  const [stripeReady, setStripeReady] = React.useState(false);
+  const [stripeObj, setStripeObj]     = React.useState(null);
+  const [cardEl, setCardEl]           = React.useState(null);
+  const [cardReady, setCardReady]     = React.useState(false);
+  const [paying, setPaying]           = React.useState(false);
+  const [payMsg, setPayMsg]           = React.useState(null);
+  const cardMountRef = React.useRef(null);
+
+  React.useEffect(()=>{
+    if(!payStep||!cardMountRef.current) return;
+    const s = window.Stripe("pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K");
+    setStripeObj(s);
+    const els = s.elements();
+    const card = els.create("card",{
+      style:{base:{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"16px",color:loginTheme==="dark"?"#ffffff":"#0f172a","::placeholder":{color:"#94a3b8"}}},
+      hidePostalCode:true
+    });
+    setTimeout(()=>{
+      if(cardMountRef.current){ card.mount(cardMountRef.current); card.on("change",e=>setCardReady(e.complete)); setCardEl(card); setStripeReady(true); }
+    },150);
+    return ()=>{ try{ card.unmount(); }catch(e){} };
+  },[payStep]);
+
+  async function handlePay(){
+    if(!stripeObj||!cardEl||paying) return;
+    setPaying(true); setPayMsg(null);
+    try{
+      const res = await fetch("https://bullnote-payments.tradingmarcon.workers.dev/create-subscription",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({plan:payPlan, email:payUser.email, userId:payUser.uid})
+      });
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      const {error:confirmErr} = await stripeObj.confirmCardPayment(data.clientSecret,{
+        payment_method:{card:cardEl}
+      });
+      if(confirmErr) throw new Error(confirmErr.message);
+      setPayMsg({type:"success", text:"✅ Subscription activated! Redirecting..."});
+      setTimeout(()=>onLogin(payUser), 1500);
+    }catch(e){
+      setPayMsg({type:"error", text:"Payment error: "+e.message});
+    }
+    setPaying(false);
+  }
 
   function toggleLoginTheme(){
     const next=loginTheme==="dark"?"light":"dark";
@@ -924,6 +973,16 @@ function LoginScreen({onLogin}){
         }catch(e){ console.warn("profile save failed",e); }
 
         await window.fbSendEmailVerification(cred.user, verificationSettings);
+
+        // If came with a plan, go to payment step BEFORE logging out
+        if(urlPlan==="pro"||urlPlan==="premium"){
+          setPayUser(cred.user);
+          setPayPlan(urlPlan);
+          setPayStep(true);
+          setLoading(false);
+          return;
+        }
+
         await window.fbSignOut(window.auth);
         setVerifyEmail(email.trim());
         setGeneratedUsername(username);
@@ -1020,6 +1079,56 @@ function LoginScreen({onLogin}){
             ← Back to Sign In
           </button>
         </>)}
+      </div>
+    </div>
+  );
+
+  // ── PAYMENT STEP SCREEN ──
+  if(payStep) return (
+    <div style={{minHeight:"100vh",background:LC.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Barlow Condensed',sans-serif",padding:20}}>
+      <div style={{background:LC.card,border:`1px solid ${LC.border}`,borderRadius:24,padding:"40px 36px",maxWidth:480,width:"100%",boxShadow:"0 32px 80px rgba(0,0,0,0.4)"}}>
+        {/* Header */}
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <img src={loginTheme==="dark"?"image_dark.png":"image2.png"} style={{height:60,marginBottom:16}}/>
+          <div style={{fontSize:26,fontWeight:900,color:LC.text,marginBottom:6}}>
+            {payPlan==="premium"?"⭐ BullNote Premium":"🚀 BullNote Pro"}
+          </div>
+          <div style={{fontSize:32,fontWeight:900,background:"linear-gradient(135deg,#22C55E,#3b82f6)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+            {payPlan==="premium"?"$24.99":"$16.99"}<span style={{fontSize:15,fontWeight:600,color:LC.muted,WebkitTextFillColor:LC.muted}}>/month</span>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div style={{background:LC.panel,borderRadius:14,padding:"14px 18px",marginBottom:24,border:`1px solid ${LC.border}`}}>
+          {(payPlan==="premium"
+            ?["✓ Unlimited trades","✓ Full dashboard & calendar","✓ Strategy analysis","✓ AI Psychology analysis","✓ Weekly report","✓ Priority support"]
+            :["✓ Unlimited trades","✓ Full dashboard & calendar","✓ Strategy analysis","✓ Multi-language (EN/PT/ES)"]
+          ).map((f,i)=>(
+            <div key={i} style={{fontSize:14,color:LC.text,padding:"4px 0",fontWeight:600}}>{f}</div>
+          ))}
+        </div>
+
+        {/* Stripe card */}
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{fontSize:14,fontWeight:700,color:LC.muted}}>💳 Card details</div>
+          <div ref={cardMountRef} style={{background:loginTheme==="dark"?"#1E293B":"#f1f5f9",borderRadius:12,padding:"14px 16px",border:`1px solid ${LC.border}`}}/>
+
+          {payMsg&&(
+            <div style={{padding:"11px 16px",borderRadius:10,background:payMsg.type==="success"?"#22c55e15":"#ef444415",border:`1px solid ${payMsg.type==="success"?"#22c55e40":"#ef444440"}`,color:payMsg.type==="success"?"#22c55e":"#ef4444",fontSize:14,fontWeight:600}}>
+              {payMsg.text}
+            </div>
+          )}
+
+          <button onClick={handlePay} disabled={!cardReady||paying} style={{background:cardReady&&!paying?"linear-gradient(135deg,#22C55E,#3b82f6)":"#1E293B",color:"#fff",border:"none",borderRadius:12,padding:"14px",fontFamily:"inherit",fontWeight:700,cursor:cardReady&&!paying?"pointer":"not-allowed",fontSize:17,opacity:cardReady&&!paying?1:0.6}}>
+            {paying?"⏳ Processing...":"Pay & Activate →"}
+          </button>
+
+          <button onClick={()=>{ window.fbSignOut(window.auth).catch(()=>{}); setPayStep(false); onLogin(payUser); }} style={{background:"none",border:"none",cursor:"pointer",color:LC.muted,fontSize:13,fontFamily:"inherit",textDecoration:"underline"}}>
+            Skip for now — continue with Free plan
+          </button>
+
+          <div style={{fontSize:11,color:LC.muted,textAlign:"center"}}>🔒 Secure payment via Stripe · Cancel anytime</div>
+        </div>
       </div>
     </div>
   );
