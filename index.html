@@ -304,7 +304,7 @@ section{position:relative; z-index:1}
 }
 
 .pricing-grid{
-  display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:780px; margin:0 auto;
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; max-width:1100px; margin:0 auto;
 }
 .pricing-card{
   background:var(--card); border:1px solid var(--border);
@@ -460,8 +460,7 @@ footer{
   .preview-inner{grid-template-columns:1fr}
   .pricing-grid{grid-template-columns:1fr}
   .hero-stats .stat-divider{display:none}
-  footer{flex-direction:column; text-align:center}
-}
+  footer{flex-direction:column; text-align:center}}
 
 /* equity curve svg */
 .eq-path{stroke-dasharray:1000;stroke-dashoffset:1000;animation:drawLine 2s .5s ease forwards}
@@ -695,6 +694,28 @@ footer{
     </div>
 
     <div class="pricing-grid">
+
+      <!-- FREE -->
+      <div class="pricing-card reveal">
+        <div class="plan-name" data-t="freePlanName">Free</div>
+        <div class="plan-price">
+          <span class="amount">$0</span>
+          <span class="period" data-t="perMonth">/month</span>
+        </div>
+        <p class="plan-desc" data-t="freeDesc">Get started for free. Perfect for trying out BullNote.</p>
+        <div class="plan-divider"></div>
+        <ul class="plan-features">
+          <li><div class="feat-check yes">✓</div><span data-t="ff1">Trade Journal — 15 trades/month</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="ff2">Performance Dashboard</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="ff3">Discipline Score</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="ff4">Trade Rating (⭐ 1–5)</span></li>
+          <li><div class="feat-check no">✗</div><span style="color:var(--muted)" data-t="ff5">Trading Calendar</span></li>
+          <li><div class="feat-check no">✗</div><span style="color:var(--muted)" data-t="ff6">Strategy Analysis</span></li>
+          <li><div class="feat-check yes">✓</div><span data-t="ff7">Multi-language (EN/PT/ES)</span></li>
+          <li><div class="feat-check no">✗</div><span style="color:var(--muted)" data-t="pf8">AI Psychology Analysis</span></li>
+        </ul>
+        <a href="app.html" class="plan-cta secondary" data-t="freeBtn">Get Started Free</a>
+      </div>
 
       <!-- PRO -->
       <div class="pricing-card reveal">
@@ -934,6 +955,10 @@ const T = {
     pf4:'Trade Rating (⭐ 1–5)', pf5:'Trading Calendar', pf6:'Strategy Analysis',
     pf7:'Multi-language (EN/PT/ES)', pf8:'AI Psychology Analysis', pf8ai:'🧠 AI Psychology Analysis',
     proBtn:'Get Started', premiumBtn:'Start 3-Day Free Trial →',
+    freeBtn:'Get Started Free', freePlanName:'Free',
+    freeDesc:'Get started for free. Perfect for trying out BullNote.',
+    ff1:'Trade Journal — 15 trades/month', ff2:'Performance Dashboard', ff3:'Discipline Score',
+    ff4:'Trade Rating (⭐ 1–5)', ff5:'Trading Calendar', ff6:'Strategy Analysis', ff7:'Multi-language (EN/PT/ES)',
     popularBadge:'Most Popular', trialNote:'No credit card required for trial',
     socialLabel:'Traders Love It', socialTitle:'Real traders, real results',
     t1:'"BullNote completely changed how I review my trades. The Discipline Score keeps me accountable every single day."',
@@ -991,6 +1016,10 @@ const T = {
     pf4:'Avaliação do Trade (⭐ 1–5)', pf5:'Calendário de Trades', pf6:'Análise por Estratégia',
     pf7:'Multi-idioma (EN/PT/ES)', pf8:'Análise Psicológica por IA', pf8ai:'🧠 Análise Psicológica por IA',
     proBtn:'Começar', premiumBtn:'Iniciar Trial de 3 Dias →',
+    freeBtn:'Começar Grátis', freePlanName:'Grátis',
+    freeDesc:'Comece sem pagar nada. Perfeito para experimentar o BullNote.',
+    ff1:'Diário de Trades — 15 trades/mês', ff2:'Dashboard de Performance', ff3:'Score de Disciplina',
+    ff4:'Avaliação do Trade (⭐ 1–5)', ff5:'Calendário de Trades', ff6:'Análise por Estratégia', ff7:'Multi-idioma (EN/PT/ES)',
     popularBadge:'Mais Popular', trialNote:'Trial sem cartão de crédito',
     socialLabel:'Traders Adoram', socialTitle:'Traders reais, resultados reais',
     t1:'"O BullNote mudou completamente como eu reviso meus trades. O Score de Disciplina me mantém responsável todo dia."',
@@ -1048,6 +1077,10 @@ const T = {
     pf4:'Evaluación del Trade (⭐ 1–5)', pf5:'Calendario de Trades', pf6:'Análisis por Estrategia',
     pf7:'Multi-idioma (EN/PT/ES)', pf8:'Análisis Psicológico por IA', pf8ai:'🧠 Análisis Psicológico por IA',
     proBtn:'Comenzar', premiumBtn:'Iniciar Trial de 3 Días →',
+    freeBtn:'Comenzar Gratis', freePlanName:'Gratis',
+    freeDesc:'Empieza sin pagar nada. Perfecto para probar BullNote.',
+    ff1:'Diario de Trades — 15 trades/mes', ff2:'Dashboard de Rendimiento', ff3:'Score de Disciplina',
+    ff4:'Evaluación del Trade (⭐ 1–5)', ff5:'Calendario de Trades', ff6:'Análisis por Estrategia', ff7:'Multi-idioma (EN/PT/ES)',
     popularBadge:'Más Popular', trialNote:'Trial sin tarjeta de crédito',
     socialLabel:'Traders lo Aman', socialTitle:'Traders reales, resultados reales',
     t1:'"BullNote cambió completamente cómo reviso mis operaciones. El Score de Disciplina me mantiene responsable cada día."',
