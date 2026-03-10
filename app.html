@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
 <title>BullNote</title>
+<script src="https://js.stripe.com/v3/"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -1294,9 +1295,9 @@ function PsychologyAI({trades, C, lang}){
   );
 }
 
-function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername}){
+function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername, userPlan, subscriptionId, planExpiry, onPlanChange}){
   const labels = {
-    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança",
+    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança", planTab:"Plano",
       name:"Nome de exibição", email:"Email", newEmail:"Novo email",
       emailInfo:"Um link de confirmação será enviado para o novo email.",
       emailSent:"✅ Link de confirmação enviado! Verifique sua caixa de entrada.",
@@ -1305,8 +1306,12 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       success:"Alterações salvas!", reauthMsg:"Por segurança, confirme sua senha atual antes de continuar.",
       pwdMismatch:"As senhas não coincidem.", pwdShort:"Mínimo 6 caracteres.",
       photoLabel:"Foto de perfil", changePhoto:"Alterar foto", uploading:"Enviando...",
-      close:"Fechar" },
-    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad",
+      close:"Fechar",
+      planCurrent:"Seu plano atual", planFree:"Gratuito", planPro:"Pro", planPremium:"Premium",
+      planUpgrade:"Fazer upgrade", planCancel:"Cancelar assinatura", planCanceling:"Cancelando...",
+      planCanceled:"Assinatura cancelada.", planRenews:"Renova em", planPayNow:"Pagar agora",
+      planProcessing:"Processando...", planSuccess:"✅ Assinatura ativada!", planError:"Erro no pagamento." },
+    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad", planTab:"Plan",
       name:"Nombre visible", email:"Email actual", newEmail:"Nuevo email",
       emailInfo:"Se enviará un enlace de confirmación al nuevo email.",
       emailSent:"✅ ¡Enlace enviado! Revisa tu bandeja de entrada.",
@@ -1315,8 +1320,12 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       success:"¡Cambios guardados!", reauthMsg:"Por seguridad, confirma tu contraseña actual antes de continuar.",
       pwdMismatch:"Las contraseñas no coinciden.", pwdShort:"Mínimo 6 caracteres.",
       photoLabel:"Foto de perfil", changePhoto:"Cambiar foto", uploading:"Subiendo...",
-      close:"Cerrar" },
-    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security",
+      close:"Cerrar",
+      planCurrent:"Tu plan actual", planFree:"Gratuito", planPro:"Pro", planPremium:"Premium",
+      planUpgrade:"Mejorar plan", planCancel:"Cancelar suscripción", planCanceling:"Cancelando...",
+      planCanceled:"Suscripción cancelada.", planRenews:"Se renueva el", planPayNow:"Pagar ahora",
+      planProcessing:"Procesando...", planSuccess:"✅ ¡Suscripción activada!", planError:"Error en el pago." },
+    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security", planTab:"Plan",
       name:"Display name", email:"Current email", newEmail:"New email",
       emailInfo:"A confirmation link will be sent to the new email.",
       emailSent:"✅ Confirmation link sent! Check your inbox.",
@@ -1325,7 +1334,11 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       success:"Changes saved!", reauthMsg:"For security, confirm your current password before continuing.",
       pwdMismatch:"Passwords do not match.", pwdShort:"Minimum 6 characters.",
       photoLabel:"Profile photo", changePhoto:"Change photo", uploading:"Uploading...",
-      close:"Close" },
+      close:"Close",
+      planCurrent:"Your current plan", planFree:"Free", planPro:"Pro", planPremium:"Premium",
+      planUpgrade:"Upgrade plan", planCancel:"Cancel subscription", planCanceling:"Canceling...",
+      planCanceled:"Subscription canceled.", planRenews:"Renews on", planPayNow:"Pay now",
+      planProcessing:"Processing...", planSuccess:"✅ Subscription activated!", planError:"Payment error." },
   };
   const L = labels[lang]||labels.en;
 
@@ -1338,6 +1351,68 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
   const [loading, setLoading]     = React.useState(false);
   const [photoUploading, setPhotoUploading] = React.useState(false);
   const [photoURL, setPhotoURL]   = React.useState(userPhotoURL||null);
+  // Plan/Stripe state
+  const [selectedPlan, setSelectedPlan] = React.useState(null); // "pro"|"premium"
+  const [cardReady, setCardReady]   = React.useState(false);
+  const [stripeObj, setStripeObj]   = React.useState(null);
+  const [cardElement, setCardElement] = React.useState(null);
+  const [payMsg, setPayMsg]         = React.useState(null);
+  const [paying, setPaying]         = React.useState(false);
+  const [canceling, setCanceling]   = React.useState(false);
+  const cardRef = React.useRef(null);
+
+  // Init Stripe + mount card when plan selected
+  React.useEffect(()=>{
+    if(!selectedPlan || !cardRef.current) return;
+    const s = window.Stripe("pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K");
+    setStripeObj(s);
+    const elements = s.elements();
+    const card = elements.create("card",{
+      style:{base:{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"16px",color: C.text=="#fff"||C.text==="#fff"?"#ffffff":"#0f172a","::placeholder":{color:"#94a3b8"}}},
+      hidePostalCode:true
+    });
+    setTimeout(()=>{
+      if(cardRef.current){ card.mount(cardRef.current); card.on("change",e=>setCardReady(e.complete)); setCardElement(card); }
+    },100);
+    return ()=>{ try{ card.unmount(); }catch(e){} };
+  },[selectedPlan]);
+
+  async function handlePay(){
+    if(!stripeObj||!cardElement||!paying===false) return;
+    setPaying(true); setPayMsg(null);
+    try{
+      const res = await fetch("https://bullnote-payments.tradingmarcon.workers.dev/create-subscription",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({plan:selectedPlan, email:currentUser.email, userId:currentUser.uid})
+      });
+      const data = await res.json();
+      if(data.error) throw new Error(data.error);
+      const {error: confirmError} = await stripeObj.confirmCardPayment(data.clientSecret,{
+        payment_method:{card:cardElement}
+      });
+      if(confirmError) throw new Error(confirmError.message);
+      setPayMsg({type:"success", text: L.planSuccess});
+      onPlanChange(selectedPlan, data.subscriptionId);
+      setTimeout(()=>{ setSelectedPlan(null); setPayMsg(null); },2000);
+    }catch(e){
+      setPayMsg({type:"error", text: L.planError+" "+e.message});
+    }
+    setPaying(false);
+  }
+
+  async function handleCancel(){
+    if(!subscriptionId) return;
+    setCanceling(true);
+    try{
+      await fetch("https://bullnote-payments.tradingmarcon.workers.dev/cancel-subscription",{
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({subscriptionId})
+      });
+      setPayMsg({type:"success", text: L.planCanceled});
+      onPlanChange("free", null);
+    }catch(e){ setPayMsg({type:"error", text:e.message}); }
+    setCanceling(false);
+  }
   const [msg, setMsg]             = React.useState(null);
   const [showCurr, setShowCurr]   = React.useState(false);
   const [showNew, setShowNew]     = React.useState(false);
@@ -1515,7 +1590,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
         {/* ── TABS ── */}
         <div style={{display:"flex",gap:6,padding:"24px 36px 0"}}>
-          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab]].map(([t,l])=>(
+          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab],["plan","💳 "+L.planTab]].map(([t,l])=>(
             <button key={t} onClick={()=>{setTab(t);setMsg(null);setCurrentPwd("");}} style={{padding:"9px 20px",borderRadius:10,border:"none",background:tab===t?"linear-gradient(135deg,#22C55E,#3b82f6)":"transparent",color:tab===t?"#fff":C.muted,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}>
               {l}
             </button>
@@ -1610,6 +1685,79 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             </div>
           </>)}
 
+          {/* ── PLAN TAB ── */}
+          {tab==="plan"&&(<>
+            {/* Current plan badge */}
+            <div style={{background:C.panel,borderRadius:14,padding:"18px 20px",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4}}>{L.planCurrent}</div>
+                <div style={{fontSize:26,fontWeight:900,background:userPlan==="free"?"none":"linear-gradient(135deg,#22C55E,#3b82f6)",WebkitBackgroundClip:userPlan==="free"?"unset":"text",WebkitTextFillColor:userPlan==="free"?"unset":"transparent",color:userPlan==="free"?C.text:"transparent"}}>
+                  {userPlan==="premium"?L.planPremium:userPlan==="pro"?L.planPro:L.planFree}
+                </div>
+                {planExpiry&&userPlan!=="free"&&(
+                  <div style={{fontSize:12,color:C.muted,marginTop:4}}>{L.planRenews}: {new Date(planExpiry*1000).toLocaleDateString()}</div>
+                )}
+              </div>
+              <div style={{fontSize:36}}>{userPlan==="premium"?"⭐":userPlan==="pro"?"🚀":"🆓"}</div>
+            </div>
+
+            {payMsg&&(
+              <div style={{padding:"11px 16px",borderRadius:10,background:payMsg.type==="success"?"#22c55e15":"#ef444415",border:`1px solid ${payMsg.type==="success"?"#22c55e40":"#ef444440"}`,color:payMsg.type==="success"?"#22c55e":"#ef4444",fontSize:14,fontWeight:600}}>
+                {payMsg.text}
+              </div>
+            )}
+
+            {/* Plan cards - show only if not already on that plan */}
+            {!selectedPlan&&(<>
+              <div style={{display:"flex",gap:12}}>
+                {userPlan!=="pro"&&(
+                  <div style={{flex:1,background:C.panel,borderRadius:14,padding:"16px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{fontSize:18,fontWeight:900,color:C.text}}>🚀 Pro</div>
+                    <div style={{fontSize:28,fontWeight:900,background:"linear-gradient(135deg,#22C55E,#3b82f6)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>$16.99<span style={{fontSize:14,fontWeight:600,WebkitTextFillColor:C.muted,background:"none",color:C.muted}}>/mo</span></div>
+                    <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>✓ Trades ilimitados<br/>✓ Dashboard completo<br/>✓ Calendário de trading<br/>✓ Análise de estratégia</div>
+                    <button onClick={()=>setSelectedPlan("pro")} style={{background:"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,marginTop:"auto"}}>
+                      {L.planUpgrade} →
+                    </button>
+                  </div>
+                )}
+                {userPlan!=="premium"&&(
+                  <div style={{flex:1,background:C.panel,borderRadius:14,padding:"16px",border:`2px solid #22C55E60`,display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{fontSize:18,fontWeight:900,color:C.text}}>⭐ Premium</div>
+                    <div style={{fontSize:28,fontWeight:900,background:"linear-gradient(135deg,#f59e0b,#ef4444)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>$24.99<span style={{fontSize:14,fontWeight:600,WebkitTextFillColor:C.muted,background:"none",color:C.muted}}>/mo</span></div>
+                    <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>✓ Tudo do Pro<br/>✓ IA Psicologia<br/>✓ Relatório semanal<br/>✓ Suporte prioritário</div>
+                    <button onClick={()=>setSelectedPlan("premium")} style={{background:"linear-gradient(135deg,#f59e0b,#ef4444)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,marginTop:"auto"}}>
+                      {L.planUpgrade} →
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Cancel button if subscribed */}
+              {userPlan!=="free"&&subscriptionId&&(
+                <button onClick={handleCancel} disabled={canceling} style={{background:"none",border:`1px solid #ef444460`,borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:14,color:"#ef4444",opacity:canceling?0.6:1}}>
+                  {canceling?L.planCanceling:L.planCancel}
+                </button>
+              )}
+            </>)}
+
+            {/* Stripe card form */}
+            {selectedPlan&&(
+              <div style={{background:C.panel,borderRadius:14,padding:"20px",border:`1px solid ${C.border}`,display:"flex",flexDirection:"column",gap:16}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{fontSize:16,fontWeight:800,color:C.text}}>
+                    💳 {selectedPlan==="premium"?"Premium — $24.99/mo":"Pro — $16.99/mo"}
+                  </div>
+                  <button onClick={()=>{setSelectedPlan(null);setPayMsg(null);}} style={{background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:18}}>✕</button>
+                </div>
+                <div ref={cardRef} style={{background:C.bg||"#0f1117",borderRadius:10,padding:"14px 16px",border:`1px solid ${C.border}`}}/>
+                <button onClick={handlePay} disabled={!cardReady||paying} style={{background:cardReady&&!paying?"linear-gradient(135deg,#22C55E,#3b82f6)":"#1E293B",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontFamily:"inherit",fontWeight:700,cursor:cardReady&&!paying?"pointer":"not-allowed",fontSize:16,opacity:cardReady&&!paying?1:0.6}}>
+                  {paying?L.planProcessing:L.planPayNow}
+                </button>
+                <div style={{fontSize:11,color:C.muted,textAlign:"center"}}>🔒 Pagamento seguro via Stripe</div>
+              </div>
+            )}
+          </>)}
+
           {/* Sign out */}
           <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
             <button onClick={onLogout} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:12,padding:"12px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"border-color 0.2s"}}
@@ -1655,6 +1803,9 @@ function App(){
   const [loading,setLoading]=useState(false);
 
   const [trades,setTrades]=useState([]);
+  const [userPlan,setUserPlan]=useState("free"); // "free" | "pro" | "premium"
+  const [subscriptionId,setSubscriptionId]=useState(null);
+  const [planExpiry,setPlanExpiry]=useState(null);
   const [strategies,setStrategies]=useState(["Breakout","Pullback","Reversal"]);
   const [symbolsList,setSymbolsList]=useState(["NQ","ES"]);
 
@@ -1662,6 +1813,7 @@ function App(){
   const [showNewStrategy,setShowNewStrategy]=useState(false);
   const [showManage,setShowManage]=useState(false);
   const [showAccount,setShowAccount]=useState(false);
+  const [showUpgradeModal,setShowUpgradeModal]=useState(false);
   const [userPhotoURL,setUserPhotoURL]=useState(null);
   const [userUsername,setUserUsername]=useState("");
   const [newSymbolInput,setNewSymbolInput]=useState("");
@@ -1896,7 +2048,7 @@ function App(){
   }
 
   function login(user){setCurrentUser(user);setLoggedIn(true);}
-  async function logout(){await window.fbSignOut(window.auth);setCurrentUser(null);setLoggedIn(false);setTrades([]);setUserPhotoURL(null);setUserUsername("");}
+  async function logout(){await window.fbSignOut(window.auth);setCurrentUser(null);setLoggedIn(false);setTrades([]);setUserPhotoURL(null);setUserUsername("");setUserPlan("free");setSubscriptionId(null);}
 
   // Wait for Firebase
   useEffect(()=>{
@@ -1911,7 +2063,18 @@ function App(){
     function setupAuth(){
       unsub = window.fbOnAuthStateChanged(window.auth, user=>{
         setDbReady(true);
-        if(user){ setCurrentUser(user); setLoggedIn(true); setUserPhotoURL(null); setUserUsername(""); }
+        if(user){
+          setCurrentUser(user); setLoggedIn(true); setUserPhotoURL(null); setUserUsername("");
+          // Fetch subscription plan
+          fetch("https://bullnote-payments.tradingmarcon.workers.dev/get-subscription",{
+            method:"POST", headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({userId: user.uid})
+          }).then(r=>r.json()).then(d=>{
+            setUserPlan(d.plan||"free");
+            setSubscriptionId(d.subscriptionId||null);
+            setPlanExpiry(d.currentPeriodEnd||null);
+          }).catch(()=>{});
+        }
         else{ setCurrentUser(null); setLoggedIn(false); setTrades([]); setUserPhotoURL(null); setUserUsername(""); }
       });
     }
@@ -2065,6 +2228,16 @@ function App(){
 
   async function handleSave(){
     if(!form.symbol) return;
+    // Free tier limit: 15 trades/month
+    if(!editTrade && userPlan==="free"){
+      const now=new Date();
+      const monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split("T")[0];
+      const thisMonth=trades.filter(t=>t.date>=monthStart);
+      if(thisMonth.length>=15){
+        setShowUpgradeModal(true);
+        return;
+      }
+    }
     setSaving(true);
     const parse=(v)=>v===""?"":parseFloat(v)||0;
     const trade={...form,tradeN:parseInt(form.tradeN)||0,contracts:parse(form.contracts),entryPrice:parse(form.entryPrice),targetPrice:parse(form.targetPrice),stopPrice:parse(form.stopPrice),partial1Price:parse(form.partial1Price),partial1Contracts:parse(form.partial1Contracts),partial2Price:parse(form.partial2Price),partial2Contracts:parse(form.partial2Contracts),finalTargetPrice:parse(form.finalTargetPrice),profitTarget:parse(form.profitTarget),actualPnl:parse(form.actualPnl)};
@@ -2390,6 +2563,11 @@ function App(){
                   </div>
               }
               <span style={{fontSize:13,color:C.sub,maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentUser?.displayName||currentUser?.email||""}</span>
+              {userPlan!=="free"&&(
+                <span style={{fontSize:10,fontWeight:800,padding:"2px 7px",borderRadius:6,background:userPlan==="premium"?"linear-gradient(135deg,#f59e0b,#ef4444)":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",letterSpacing:"0.05em",textTransform:"uppercase",flexShrink:0}}>
+                  {userPlan}
+                </span>
+              )}
               <button onClick={e=>{e.stopPropagation();logout();}} style={{background:"none",color:C.muted,border:"none",cursor:"pointer",fontSize:16,padding:"0 4px",lineHeight:1}} title={T.logout}>⏻</button>
             </div>
           </div>
@@ -3015,7 +3193,30 @@ function App(){
 
       {/* ACCOUNT MODAL */}
       {showAccount&&(
-        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername}/>
+        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername} userPlan={userPlan} subscriptionId={subscriptionId} planExpiry={planExpiry} onPlanChange={(plan,subId)=>{setUserPlan(plan);setSubscriptionId(subId||null);}}/>
+      )}
+
+      {/* UPGRADE MODAL - free tier limit reached */}
+      {showUpgradeModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,backdropFilter:"blur(8px)"}}>
+          <div style={{background:C.card,border:`1px solid #22C55E40`,borderRadius:20,padding:36,width:420,textAlign:"center",boxShadow:"0 25px 60px rgba(0,0,0,0.7)"}}>
+            <div style={{fontSize:48,marginBottom:12}}>🚀</div>
+            <div style={{fontSize:24,fontWeight:900,color:C.text,marginBottom:8}}>
+              {lang==="pt"?"Limite do plano gratuito atingido!":lang==="es"?"¡Límite del plan gratuito alcanzado!":"Free plan limit reached!"}
+            </div>
+            <div style={{fontSize:15,color:C.muted,marginBottom:24,lineHeight:1.6}}>
+              {lang==="pt"?"Você atingiu o limite de 15 trades por mês no plano gratuito. Faça upgrade para adicionar trades ilimitados.":lang==="es"?"Alcanzaste el límite de 15 operaciones por mes en el plan gratuito. Actualiza para agregar operaciones ilimitadas.":"You've reached the 15 trades/month limit on the free plan. Upgrade to add unlimited trades."}
+            </div>
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={()=>{setShowUpgradeModal(false);setShowAccount(true);}} style={{flex:1,background:"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:16}}>
+                {lang==="pt"?"Ver planos":lang==="es"?"Ver planes":"See plans"} ✨
+              </button>
+              <button onClick={()=>setShowUpgradeModal(false)} style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:12,padding:"13px",fontFamily:"inherit",cursor:"pointer",fontSize:15}}>
+                {lang==="pt"?"Fechar":lang==="es"?"Cerrar":"Close"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* CONFIRM DELETE */}
