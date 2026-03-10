@@ -904,31 +904,24 @@ function LoginScreen({onLogin}){
 
         // Generate unique username: firstname + random suffix e.g. "daniel_x7k2"
         const base = name.trim().split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12) || "trader";
-        let username = "";
-        let attempts = 0;
-        while(attempts < 10){
-          const suffix = Math.random().toString(36).slice(2,6);
-          const candidate = `${base}_${suffix}`;
-          // Check uniqueness in Firestore
-          const snap = await window.fsGetDocs(
-            window.fsQuery(window.fsCollection(window.db,"usernames"), window.fsWhere("username","==",candidate))
-          );
-          if(snap.empty){ username = candidate; break; }
-          attempts++;
-        }
-        if(!username) username = `trader_${Date.now().toString(36).slice(-6)}`;
+        const suffix = Math.random().toString(36).slice(2,6);
+        const username = `${base}_${suffix}`;
 
         const cred = await window.fbCreateUser(window.auth, email.trim(), pw);
         await window.fbUpdateProfile(cred.user, {displayName: name.trim()});
 
-        // Save username → email mapping in global collection (for password reset lookup)
-        await window.fsSetDoc(window.fsDoc(window.db,"usernames", username), {
-          username, email: email.trim(), uid: cred.user.uid, createdAt: Date.now()
-        });
+        // Save username → email mapping (now authenticated)
+        try{
+          await window.fsSetDoc(window.fsDoc(window.db,"usernames", username), {
+            username, email: email.trim(), uid: cred.user.uid, createdAt: Date.now()
+          });
+        }catch(e){ console.warn("username save failed",e); }
         // Also save username in user's own profile
-        await window.fsSetDoc(window.fsDoc(window.db,`users/${cred.user.uid}/settings`,"profile"), {
-          username, displayName: name.trim()
-        }, {merge:true});
+        try{
+          await window.fsSetDoc(window.fsDoc(window.db,`users/${cred.user.uid}/settings`,"profile"), {
+            username, displayName: name.trim()
+          }, {merge:true});
+        }catch(e){ console.warn("profile save failed",e); }
 
         await window.fbSendEmailVerification(cred.user, verificationSettings);
         await window.fbSignOut(window.auth);
