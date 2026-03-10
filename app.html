@@ -1094,10 +1094,7 @@ function LoginScreen({onLogin}){
       <div className="login-left" style={{width:"50%",padding:"40px 48px",display:"flex",flexDirection:"column",justifyContent:"space-between",borderRight:`1px solid ${LC.border}`,position:"relative",overflow:"hidden",minHeight:"calc(100vh - 36px)",boxSizing:"border-box"}}>
         <div>
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:48}}>
-            <div style={{width:44,height:44,borderRadius:12,background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <span style={{fontSize:22,fontWeight:900,color:"#fff",fontFamily:"'Barlow Condensed',sans-serif"}}>D</span>
-            </div>
-            <span style={{fontSize:22,fontWeight:800,color:LC.text,letterSpacing:"0.05em"}}>MARCON TRADING</span>
+            <img src={loginTheme==="dark"?"image_dark.png":"image2.png"} style={{height:52,width:"auto",objectFit:"contain"}}/>
             <button onClick={toggleLoginTheme} title="Toggle theme" style={{marginLeft:"auto",background:LC.card,border:`1px solid ${LC.border}`,borderRadius:10,padding:"7px 14px",cursor:"pointer",color:LC.text,fontSize:13,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,display:"flex",alignItems:"center",gap:6}}>
               {loginTheme==="dark"?"☀️ Light":"🌙 Dark"}
             </button>
@@ -1112,7 +1109,7 @@ function LoginScreen({onLogin}){
           </div>
 
           {/* Candle chart decoration */}
-          <div className="lchart" style={{background:loginTheme==="dark"?"#0F172A":"#0d1424",border:"1px solid #1a1f2e",borderRadius:14,padding:"14px 18px",overflow:"hidden",position:"relative",zIndex:1}}>
+          <div className="lchart" style={{background:loginTheme==="dark"?"#1E293B":"#f1f5f9",border:`1px solid ${LC.border}`,borderRadius:14,padding:"14px 18px",overflow:"hidden",position:"relative",zIndex:1}}>
             <div style={{fontSize:11,color:"#475569",fontWeight:700,letterSpacing:"0.08em",marginBottom:8}}>MARKET OVERVIEW</div>
             <svg viewBox={`0 0 ${svgW} ${svgH}`} style={{width:"100%",height:svgH,display:"block"}} preserveAspectRatio="none">
               {candles.map((c,i)=>{
