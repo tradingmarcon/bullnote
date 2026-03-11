@@ -830,14 +830,10 @@ function switchPlan(p) {
     fl.appendChild(d);
   });
 
-  // Update steps bar
+  // Update steps bar — only show payment step if paid AND on the steps bar (step 2 is shown by onEmailVerified)
   if(isPaid){
-    document.getElementById("sline").style.display="";
-    document.getElementById("s2wrap").style.display="";
     document.getElementById("s1sub").textContent = T.s1sub;
   } else {
-    document.getElementById("sline").style.display="none";
-    document.getElementById("s2wrap").style.display="none";
     document.getElementById("s1sub").textContent = T.s1subFree;
   }
 
@@ -864,7 +860,6 @@ function showMsg(id,html,type){
 
 let createdUser=null;
 let verifyPollTimer=null;
-["iName","iEmail","iPw","iPw2"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")doRegister();}));
 
 async function doRegister(){
   const T=I18N[currentLang];
@@ -1134,7 +1129,11 @@ function setLang(lang) {
   switchPlan(activePlan);
 }
 
-// Apply saved or default language on load
+// Apply saved or default language on load (DOM is ready here)
+["iName","iEmail","iPw","iPw2"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("keydown",e=>{if(e.key==="Enter")doRegister();});
+});
 setLang(currentLang);
 </script>
 </body>
