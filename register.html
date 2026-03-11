@@ -80,7 +80,7 @@ body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
 
 /* RIGHT */
 .right{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:52px 56px;overflow-y:auto;}
-.form-box{width:100%;max-width:460px;}
+.form-box{width:100%;max-width:560px;}
 
 .steps{display:flex;align-items:center;margin-bottom:40px;}
 .s-item{display:flex;align-items:center;gap:9px;}
@@ -154,6 +154,23 @@ body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
 .email-box{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:flex-start;gap:11px;text-align:left;}
 .email-box svg{width:17px;height:17px;stroke:var(--green);fill:none;stroke-width:2;flex-shrink:0;margin-top:1px;}
 .email-box p{font-size:12px;color:var(--sub);font-weight:500;line-height:1.6;}
+
+.preview-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.preview-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:#0a0f1a;}
+.mini-metric{background:#080c14;border-radius:8px;padding:9px 8px;text-align:center;}
+.mini-metric-val{font-size:13px;font-weight:800;line-height:1;margin-bottom:2px;}
+.mini-metric-val.green{color:var(--green);}
+.mini-metric-val.blue{color:var(--blue);}
+.mini-metric-val.amber{color:var(--amber);}
+.mini-metric-val.red{color:#ef4444;}
+.mini-metric-lbl{font-size:8px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+.preview-inner{padding:10px;}
+
+.why-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;}
+.why-ico{width:32px;height:32px;border-radius:8px;background:#22C55E12;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.why-ico svg{width:15px;height:15px;stroke:var(--green);}
+.why-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.why-desc{font-size:11px;color:var(--muted);font-weight:500;line-height:1.5;}
 
 @media(max-width:880px){.left{display:none;}.right{padding:28px 20px;}.grid2{grid-template-columns:1fr;}}
 </style>
@@ -280,6 +297,119 @@ body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
         <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--muted);font-weight:500;line-height:1.6;">
           By continuing you agree to our <a href="#" style="color:var(--green);text-decoration:none;font-weight:700;">Terms of Service</a> and <a href="#" style="color:var(--green);text-decoration:none;font-weight:700;">Privacy Policy</a>.
         </p>
+
+        <!-- ── DIVIDER ── -->
+        <div style="display:flex;align-items:center;gap:14px;margin:32px 0 24px;">
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+          <span style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;">What you'll get</span>
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+        </div>
+
+        <!-- ── MINI DASHBOARD PREVIEW ── -->
+        <div class="preview-card">
+          <div class="preview-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+              <span style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Live Dashboard Preview</span>
+            </div>
+            <div style="display:flex;gap:4px;">
+              <div style="width:10px;height:10px;border-radius:50%;background:#ef4444;opacity:0.6;"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--amber);opacity:0.6;"></div>
+              <div style="width:10px;height:10px;border-radius:50%;background:var(--green);opacity:0.6;"></div>
+            </div>
+          </div>
+          <!-- Metric cards row -->
+          <div style="padding:10px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="mini-metric">
+              <div class="mini-metric-val green">+$18,150</div>
+              <div class="mini-metric-lbl">P&L Total</div>
+            </div>
+            <div class="mini-metric">
+              <div class="mini-metric-val blue">66.7%</div>
+              <div class="mini-metric-lbl">Win Rate</div>
+            </div>
+            <div class="mini-metric">
+              <div class="mini-metric-val amber">6.43x</div>
+              <div class="mini-metric-lbl">Profit Factor</div>
+            </div>
+            <div class="mini-metric">
+              <div class="mini-metric-val red">-$680</div>
+              <div class="mini-metric-lbl">Max DD</div>
+            </div>
+          </div>
+          <!-- Mini equity curve -->
+          <div style="background:#080c14;border-radius:8px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Equity Curve</div>
+            <svg viewBox="0 0 300 60" style="width:100%;height:44px;" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="eq" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#22C55E" stop-opacity="0.3"/>
+                  <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,55 C20,52 30,50 45,46 C60,42 70,44 85,40 C100,36 110,38 125,32 C140,26 150,28 165,22 C180,16 190,18 205,14 C220,10 230,12 245,8 C260,4 270,6 300,3" fill="none" stroke="#22C55E" stroke-width="2" stroke-linecap="round"/>
+              <path d="M0,55 C20,52 30,50 45,46 C60,42 70,44 85,40 C100,36 110,38 125,32 C140,26 150,28 165,22 C180,16 190,18 205,14 C220,10 230,12 245,8 C260,4 270,6 300,3 L300,60 L0,60 Z" fill="url(#eq)"/>
+            </svg>
+          </div>
+          <!-- Discipline score bar -->
+          <div style="background:#080c14;border-radius:8px;padding:10px 12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;">Discipline Score</span>
+              <span style="font-size:14px;font-weight:900;color:var(--amber);">73<span style="font-size:9px;font-weight:600;color:var(--muted);">/100</span></span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:9px;color:var(--muted);font-weight:600;width:70px;flex-shrink:0;">Plan Followed</span>
+                <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:73%;height:100%;background:var(--amber);border-radius:2px;"></div></div>
+                <span style="font-size:9px;color:var(--amber);font-weight:700;width:28px;text-align:right;">73%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:9px;color:var(--muted);font-weight:600;width:70px;flex-shrink:0;">Stop Respected</span>
+                <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;"><div style="width:73%;height:100%;background:var(--amber);border-radius:2px;"></div></div>
+                <span style="font-size:9px;color:var(--amber);font-weight:700;width:28px;text-align:right;">73%</span>
+              </div>
+            </div>
+          </div>
+          </div><!-- /padding -->
+        </div><!-- /preview-card -->
+
+        <!-- ── WHY TRADERS LOVE IT ── -->
+        <div style="margin-top:24px;">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:14px;">Why traders love BullNote</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="why-row">
+              <div class="why-ico">
+                <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div>
+                <div class="why-title">Track every trade in seconds</div>
+                <div class="why-desc">Log entries, exits, strategy, psychology and chart screenshots in one place.</div>
+              </div>
+            </div>
+            <div class="why-row">
+              <div class="why-ico">
+                <svg viewBox="0 0 24 24" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+              </div>
+              <div>
+                <div class="why-title">Identify your real edge</div>
+                <div class="why-desc">See which strategies, times and symbols actually make you money.</div>
+              </div>
+            </div>
+            <div class="why-row">
+              <div class="why-ico" style="background:#3b82f615;">
+                <svg viewBox="0 0 24 24" stroke-width="2" fill="none" style="stroke:#3b82f6;"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.54-4.58A2.5 2.5 0 0 1 4 12a2.5 2.5 0 0 1 1.5-2.27A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.54-4.58A2.5 2.5 0 0 0 20 12a2.5 2.5 0 0 0-1.5-2.27A2.5 2.5 0 0 0 14.5 2z"/></svg>
+              </div>
+              <div>
+                <div class="why-title">Fix your psychology</div>
+                <div class="why-desc">AI reads your trade notes and shows the emotional patterns costing you money.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── BOTTOM SPACER ── -->
+        <div style="height:40px;"></div>
       </div>
 
       <!-- STEP 2 -->
