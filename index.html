@@ -33,7 +33,7 @@ body::before{
 /* ── NAVBAR ── */
 /* ── TOP BANNER ── */
 .top-banner{
-  position:fixed; top:0; left:0; right:0; z-index:101;
+  position:relative; top:0; left:0; right:0; z-index:101;
   height:40px; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(90deg, #16A34A, #22C55E, #10B981, #22C55E, #16A34A);
   background-size:300% 100%;
@@ -73,7 +73,7 @@ body::before{
 .top-banner-close:hover{color:#000}
 
 nav{
-  position:fixed; top:40px; left:0; right:0; z-index:100;
+  position:fixed; top:0; left:0; right:0; z-index:100;
   display:flex; align-items:center; justify-content:space-between;
   padding:0 40px; height:96px;
   background:rgba(15,23,42,.85); backdrop-filter:blur(20px);
@@ -941,7 +941,7 @@ footer{
   <div style="position:relative;z-index:1">
     <h2 data-t="ctaTitle">Ready to trade with<br/><span style="color:var(--accent)">more discipline?</span></h2>
     <p data-t="ctaSub">Join traders who stopped guessing and started growing.</p>
-    <a href="register.html" class="btn-primary" style="font-size:17px;padding:16px 40px" data-t="ctaBtn">Start Free Trial — No Credit Card →</a>
+    <a href="app.html" class="btn-primary" style="font-size:17px;padding:16px 40px" data-t="ctaBtn">Start Free Trial — No Credit Card →</a>
   </div>
 </section>
 
@@ -963,7 +963,6 @@ function closeBanner(){
   const b = document.getElementById('topBanner');
   b.style.transition='height .3s ease, opacity .3s ease';
   b.style.height='0'; b.style.opacity='0';
-  document.querySelector('nav').style.top='0';
   setTimeout(()=>b.remove(), 300);
 }
 
@@ -1063,11 +1062,8 @@ document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
 
 // ── NAVBAR SCROLL ──
 window.addEventListener('scroll',()=>{
-  const banner = document.getElementById('topBanner');
-  const bannerH = banner ? banner.offsetHeight : 0;
   const nav = document.getElementById('navbar');
   nav.style.background = window.scrollY>20 ? 'rgba(15,23,42,.97)' : 'rgba(15,23,42,.85)';
-  nav.style.top = window.scrollY > bannerH ? '0' : (bannerH - window.scrollY) + 'px';
 });
 
 // ── FAQ ──
