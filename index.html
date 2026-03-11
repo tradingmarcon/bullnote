@@ -32,8 +32,13 @@ body::before{
 
 /* ── NAVBAR ── */
 /* ── TOP BANNER ── */
+/* ── SITE HEADER WRAPPER ── */
+#site-header{
+  position:fixed; top:0; left:0; right:0; z-index:200;
+  display:flex; flex-direction:column;
+}
 .top-banner{
-  position:relative; top:0; left:0; right:0; z-index:101;
+  position:relative; z-index:201;
   height:40px; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(90deg, #16A34A, #22C55E, #10B981, #22C55E, #16A34A);
   background-size:300% 100%;
@@ -73,12 +78,12 @@ body::before{
 .top-banner-close:hover{color:#000}
 
 nav{
-  position:fixed; top:0; left:0; right:0; z-index:100;
+  position:relative; top:auto; left:auto; right:auto; z-index:100;
   display:flex; align-items:center; justify-content:space-between;
   padding:0 40px; height:96px;
   background:rgba(15,23,42,.85); backdrop-filter:blur(20px);
   border-bottom:1px solid #334155;
-  transition:all .3s;
+  transition:background .3s;
 }
 .nav-logo{
   font-family:'Montserrat',sans-serif; font-size:22px; font-weight:800;
@@ -592,6 +597,7 @@ footer{
 </head>
 <body>
 
+<div id="site-header">
 <div class="top-banner" id="topBanner" onclick="document.getElementById('pricing').scrollIntoView({behavior:'smooth'})">
   <span class="banner-pill">FREE</span>
   <span id="bannerText">🎉 Start for free — 15 trades/month, no credit card needed. See plans →</span>
@@ -615,6 +621,7 @@ footer{
     <a href="register.html" class="nav-cta" data-t="navCta">Get Started →</a>
   </div>
 </nav>
+</div><!-- /#site-header -->
 
 <!-- ══ HERO ══ -->
 <section class="hero">
