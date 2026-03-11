@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BullNote — Create Account</title>
+<script src="https://js.stripe.com/v3/"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBK5g8DCYgS7AHnELc17xX8CNG3zalFuqo",
+    authDomain: "dmarcontrading.firebaseapp.com",
+    projectId: "dmarcontrading",
+    storageBucket: "dmarcontrading.firebasestorage.app",
+    messagingSenderId: "211444944842",
+    appId: "1:211444944842:web:2d4da843a09876be810933"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const auth = getAuth(app);
+  window._fb = { db, auth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, doc, setDoc };
+  window.dispatchEvent(new Event("fbReady"));
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:'Barlow Condensed',sans-serif;}
+  body{background:#0b0f1a;min-height:100vh;display:flex;flex-direction:column;color:#fff;}
+  ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#0b0f1a;} ::-webkit-scrollbar-thumb{background:#1e2535;border-radius:4px;}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid #1a2035;}
+  .topbar img{height:64px;}
+  .topbar a{color:#64748b;font-size:14px;font-weight:600;text-decoration:none;transition:color 0.2s;}
+  .topbar a:hover{color:#22C55E;}
+
+  .wrap{flex:1;display:flex;align-items:stretch;min-height:calc(100vh - 69px);}
+
+  /* LEFT PANEL */
+  .left{width:420px;flex-shrink:0;background:linear-gradient(160deg,#0f1724 0%,#0b1320 100%);border-right:1px solid #1a2035;padding:48px 40px;display:flex;flex-direction:column;justify-content:space-between;}
+  .plan-badge{display:inline-flex;align-items:center;gap:8px;background:#22C55E18;border:1px solid #22C55E40;borderRadius:100px;padding:6px 14px;font-size:12px;font-weight:700;color:#22C55E;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:28px;}
+  .plan-name{font-size:42px;font-weight:900;line-height:1.1;margin-bottom:8px;}
+  .plan-price{font-size:24px;font-weight:700;color:#64748b;margin-bottom:32px;}
+  .plan-price span{font-size:44px;font-weight:900;background:linear-gradient(135deg,#22C55E,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .features{display:flex;flex-direction:column;gap:10px;margin-bottom:40px;}
+  .feat{display:flex;align-items:center;gap:10px;font-size:15px;color:#cbd5e1;font-weight:600;}
+  .feat .check{width:20px;height:20px;border-radius:50%;background:#22C55E20;border:1px solid #22C55E60;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .feat .check svg{width:10px;height:10px;stroke:#22C55E;fill:none;stroke-width:2.5;}
+  .feat.locked{color:#334155;}
+  .feat.locked .check{background:#1e2535;border-color:#2a3548;}
+  .feat.locked .check svg{stroke:#334155;}
+  .secure{display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-top:auto;}
+
+  /* RIGHT PANEL */
+  .right{flex:1;display:flex;align-items:center;justify-content:center;padding:48px 40px;}
+  .form-box{width:100%;max-width:440px;}
+
+  /* Steps */
+  .steps{display:flex;align-items:center;gap:0;margin-bottom:40px;}
+  .step{display:flex;align-items:center;gap:8px;}
+  .step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;transition:all 0.3s;}
+  .step-num.active{background:linear-gradient(135deg,#22C55E,#3b82f6);color:#fff;}
+  .step-num.done{background:#22C55E20;color:#22C55E;border:1px solid #22C55E40;}
+  .step-num.pending{background:#1e2535;color:#475569;}
+  .step-label{font-size:13px;font-weight:700;transition:color 0.3s;}
+  .step-label.active{color:#fff;}
+  .step-label.done{color:#22C55E;}
+  .step-label.pending{color:#475569;}
+  .step-line{flex:1;height:1px;background:#1e2535;margin:0 12px;}
+
+  .form-title{font-size:30px;font-weight:900;color:#fff;margin-bottom:6px;}
+  .form-sub{font-size:14px;color:#64748b;margin-bottom:28px;}
+
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+  .field label{font-size:12px;font-weight:700;color:#64748b;letter-spacing:0.06em;text-transform:uppercase;}
+  .field input{background:#0f1724;border:1px solid #1e2d45;border-radius:12px;padding:13px 16px;font-size:15px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:600;outline:none;transition:border-color 0.2s;}
+  .field input:focus{border-color:#22C55E60;}
+  .field input::placeholder{color:#334155;}
+
+  .btn-primary{width:100%;background:linear-gradient(135deg,#22C55E,#3b82f6);color:#fff;border:none;border-radius:12px;padding:15px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;cursor:pointer;transition:opacity 0.2s;letter-spacing:0.03em;margin-top:8px;}
+  .btn-primary:hover{opacity:0.92;}
+  .btn-primary:disabled{background:#1e2535;cursor:not-allowed;opacity:0.6;}
+
+  .msg{padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;margin-bottom:16px;line-height:1.5;}
+  .msg.error{background:#ef444415;border:1px solid #ef444440;color:#ef4444;}
+  .msg.success{background:#22c55e15;border:1px solid #22c55e40;color:#22c55e;}
+
+  /* Card element */
+  .card-wrap{background:#0f1724;border:1px solid #1e2d45;border-radius:12px;padding:14px 16px;margin-bottom:16px;transition:border-color 0.2s;}
+  .card-wrap:focus-within{border-color:#22C55E60;}
+
+  /* Success screen */
+  .success-screen{text-align:center;animation:fadeUp 0.5s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+
+  /* Responsive */
+  @media(max-width:780px){
+    .left{display:none;}
+    .topbar{padding:16px 20px;}
+    .right{padding:24px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html"><img src="image_dark.png" id="topLogo" alt="BullNote"/></a>
+  <a href="app.html">Already have an account? Sign in →</a>
+</div>
+
+<div class="wrap">
+  <!-- LEFT: Plan summary -->
+  <div class="left" id="leftPanel">
+    <div>
+      <div class="plan-badge" id="planBadge">✦ Selected Plan</div>
+      <div class="plan-name" id="planName">BullNote Pro</div>
+      <div class="plan-price">Just <span id="planPrice">$16.99</span>/month</div>
+      <div class="features" id="featureList"></div>
+    </div>
+    <div class="secure">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Secure checkout · Powered by Stripe · Cancel anytime
+    </div>
+  </div>
+
+  <!-- RIGHT: Form -->
+  <div class="right">
+    <div class="form-box">
+
+      <!-- Steps indicator -->
+      <div class="steps" id="stepsBar">
+        <div class="step">
+          <div class="step-num active" id="s1num">1</div>
+          <div class="step-label active" id="s1lbl">Account</div>
+        </div>
+        <div class="step-line" id="line1"></div>
+        <div class="step">
+          <div class="step-num pending" id="s2num">2</div>
+          <div class="step-label pending" id="s2lbl">Payment</div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Account details -->
+      <div id="step1">
+        <div class="form-title">Create your account</div>
+        <div class="form-sub" id="step1Sub">Start your journey with BullNote.</div>
+
+        <div id="msgBox1"></div>
+
+        <div class="field">
+          <label>Full name</label>
+          <input type="text" id="inp_name" placeholder="Daniel Marcon" autocomplete="name"/>
+        </div>
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" id="inp_email" placeholder="you@email.com" autocomplete="email"/>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="inp_pw" placeholder="Min. 6 characters" autocomplete="new-password"/>
+        </div>
+        <div class="field">
+          <label>Confirm password</label>
+          <input type="password" id="inp_pw2" placeholder="Repeat password" autocomplete="new-password"/>
+        </div>
+
+        <button class="btn-primary" id="btn1">Continue →</button>
+
+        <div style="text-align:center;margin-top:16px;font-size:13px;color:#475569;">
+          By creating an account you agree to our <a href="#" style="color:#22C55E;text-decoration:none;">Terms</a>.
+        </div>
+      </div>
+
+      <!-- STEP 2: Payment (only for paid plans) -->
+      <div id="step2" style="display:none;">
+        <div class="form-title">Complete payment</div>
+        <div class="form-sub">Enter your card details to activate your plan.</div>
+
+        <div id="msgBox2"></div>
+
+        <div class="card-wrap" id="cardMount"></div>
+
+        <button class="btn-primary" id="btnPay">Pay & Activate →</button>
+
+        <button id="btnSkip" style="width:100%;background:none;border:none;color:#475569;font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;cursor:pointer;margin-top:12px;text-decoration:underline;padding:4px;">
+          Skip for now — use Free plan
+        </button>
+
+        <div style="text-align:center;margin-top:12px;font-size:11px;color:#334155;">
+          🔒 Your card info is encrypted via Stripe. We never store card details.
+        </div>
+      </div>
+
+      <!-- STEP 3: Success -->
+      <div id="step3" style="display:none;" class="success-screen">
+        <div style="font-size:72px;margin-bottom:16px;">🎉</div>
+        <div style="font-size:32px;font-weight:900;color:#fff;margin-bottom:8px;">You're all set!</div>
+        <div style="font-size:15px;color:#64748b;line-height:1.6;margin-bottom:32px;" id="successMsg">
+          Your account has been created. Check your email to verify your address.
+        </div>
+        <div style="background:#22C55E15;border:1px solid #22C55E40;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
+          <div style="font-size:11px;font-weight:700;color:#22C55E;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">🎉 Your username</div>
+          <div style="font-size:28px;font-weight:900;color:#fff;font-family:monospace;" id="usernameBox"></div>
+          <div style="font-size:12px;color:#64748b;margin-top:6px;">Save this to recover your password if you forget it.</div>
+        </div>
+        <a href="app.html" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">Go to Dashboard →</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const params   = new URLSearchParams(location.search);
+const plan     = params.get("plan") || "free"; // "free"|"pro"|"premium"
+const isPaid   = plan === "pro" || plan === "premium";
+const WORKER   = "https://bullnote-payments.tradingmarcon.workers.dev";
+const PK       = "pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K";
+
+// ── Populate left panel ──────────────────────────────────────────
+const PLANS = {
+  free: {
+    name:"BullNote Free", price:"$0", badge:"🆓 Free Plan",
+    features:[
+      {t:"Trade Journal — 15 trades/month", ok:true},
+      {t:"Performance Dashboard", ok:true},
+      {t:"Discipline Score", ok:true},
+      {t:"Trade Rating (⭐ 1–5)", ok:true},
+      {t:"Trading Calendar", ok:false},
+      {t:"Strategy Analysis", ok:false},
+      {t:"AI Psychology Analysis", ok:false},
+    ]
+  },
+  pro: {
+    name:"BullNote Pro", price:"$16.99", badge:"🚀 Pro Plan",
+    features:[
+      {t:"Trade Journal — unlimited trades", ok:true},
+      {t:"Performance Dashboard", ok:true},
+      {t:"Discipline Score", ok:true},
+      {t:"Trade Rating (⭐ 1–5)", ok:true},
+      {t:"Trading Calendar", ok:true},
+      {t:"Strategy Analysis", ok:true},
+      {t:"Multi-language (EN/PT/ES)", ok:true},
+    ]
+  },
+  premium: {
+    name:"BullNote Premium", price:"$24.99", badge:"⭐ Premium Plan",
+    features:[
+      {t:"Trade Journal — unlimited trades", ok:true},
+      {t:"Performance Dashboard", ok:true},
+      {t:"Discipline Score", ok:true},
+      {t:"Trade Rating (⭐ 1–5)", ok:true},
+      {t:"Trading Calendar", ok:true},
+      {t:"Strategy Analysis", ok:true},
+      {t:"AI Psychology Analysis", ok:true},
+      {t:"Weekly Report", ok:true},
+      {t:"Priority Support", ok:true},
+    ]
+  }
+};
+
+const pd = PLANS[plan];
+document.getElementById("planBadge").textContent = pd.badge;
+document.getElementById("planName").textContent  = pd.name;
+document.getElementById("planPrice").textContent = pd.price;
+const fl = document.getElementById("featureList");
+pd.features.forEach(f=>{
+  fl.innerHTML += `<div class="feat${f.ok?"":" locked"}">
+    <div class="check"><svg viewBox="0 0 12 10"><polyline points="1,5 4,9 11,1"/></svg></div>
+    ${f.t}
+  </div>`;
+});
+
+// If free plan, hide step 2 in steps bar
+if(!isPaid){
+  document.getElementById("line1").style.display="none";
+  document.getElementById("s2num").style.display="none";
+  document.getElementById("s2lbl").style.display="none";
+  document.getElementById("step1Sub").textContent = "Create your free BullNote account.";
+}
+
+// ── Step 1: Account creation ─────────────────────────────────────
+let createdUser = null;
+
+function showMsg(boxId, text, type){
+  const b = document.getElementById(boxId);
+  b.innerHTML = text ? `<div class="msg ${type}">${text}</div>` : "";
+}
+
+function setBtn(id, text, disabled){
+  const b = document.getElementById(id);
+  b.textContent = text;
+  b.disabled = disabled;
+}
+
+document.getElementById("btn1").addEventListener("click", doRegister);
+["inp_name","inp_email","inp_pw","inp_pw2"].forEach(id=>{
+  document.getElementById(id).addEventListener("keydown", e=>{ if(e.key==="Enter") doRegister(); });
+});
+
+async function doRegister(){
+  const name  = document.getElementById("inp_name").value.trim();
+  const email = document.getElementById("inp_email").value.trim();
+  const pw    = document.getElementById("inp_pw").value;
+  const pw2   = document.getElementById("inp_pw2").value;
+
+  if(!name)          return showMsg("msgBox1","Please enter your full name.","error");
+  if(!email)         return showMsg("msgBox1","Please enter your email.","error");
+  if(pw.length < 6)  return showMsg("msgBox1","Password must be at least 6 characters.","error");
+  if(pw !== pw2)     return showMsg("msgBox1","Passwords do not match.","error");
+
+  showMsg("msgBox1","","");
+  setBtn("btn1","⏳ Creating account...", true);
+
+  // Wait for Firebase
+  await new Promise(res=>{ if(window._fb) return res(); window.addEventListener("fbReady", res, {once:true}); });
+  const {db, auth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, doc, setDoc} = window._fb;
+
+  try{
+    const base     = name.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12) || "trader";
+    const username = `${base}_${Math.random().toString(36).slice(2,6)}`;
+
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    await updateProfile(cred.user, {displayName: name});
+
+    // Save to Firestore
+    try{ await setDoc(doc(db,"usernames",username),{username,email,uid:cred.user.uid,createdAt:Date.now()}); }catch(e){}
+    try{ await setDoc(doc(db,`users/${cred.user.uid}/settings`,"profile"),{username,displayName:name,plan:"free"},{merge:true}); }catch(e){}
+
+    await sendEmailVerification(cred.user, {url: "https://bullnote.pages.dev/app.html"});
+
+    createdUser = cred.user;
+    document.getElementById("usernameBox").textContent = username;
+
+    if(isPaid){
+      // Go to payment step
+      document.getElementById("step1").style.display = "none";
+      document.getElementById("step2").style.display = "block";
+      // Update steps UI
+      document.getElementById("s1num").className = "step-num done";
+      document.getElementById("s1num").innerHTML = `<svg width="12" height="12" viewBox="0 0 12 10" fill="none" stroke="#22C55E" stroke-width="2.5"><polyline points="1,5 4,9 11,1"/></svg>`;
+      document.getElementById("s1lbl").className = "step-label done";
+      document.getElementById("s2num").className = "step-num active";
+      document.getElementById("s2lbl").className = "step-label active";
+      initStripe();
+    } else {
+      // Free plan — go straight to success
+      goSuccess("free");
+    }
+
+  }catch(e){
+    const msgs = {
+      "auth/email-already-in-use":"This email is already registered. <a href='app.html' style='color:#22C55E'>Sign in →</a>",
+      "auth/invalid-email":"Invalid email address.",
+      "auth/too-many-requests":"Too many attempts. Try again later.",
+    };
+    showMsg("msgBox1", msgs[e.code]||e.message, "error");
+    setBtn("btn1","Continue →", false);
+  }
+}
+
+// ── Stripe ───────────────────────────────────────────────────────
+let stripe, cardElement;
+
+function initStripe(){
+  stripe = window.Stripe(PK);
+  const elements = stripe.elements();
+  cardElement = elements.create("card",{
+    style:{base:{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"16px",color:"#ffffff","::placeholder":{color:"#475569"}}},
+    hidePostalCode:true
+  });
+  setTimeout(()=>{
+    cardElement.mount("#cardMount");
+    cardElement.on("change", e=>{
+      document.getElementById("btnPay").disabled = !e.complete;
+    });
+    document.getElementById("btnPay").disabled = true;
+  },150);
+}
+
+document.getElementById("btnPay").addEventListener("click", doPay);
+
+async function doPay(){
+  if(!stripe||!cardElement||!createdUser) return;
+  showMsg("msgBox2","","");
+  setBtn("btnPay","⏳ Processing...", true);
+
+  try{
+    const res = await fetch(`${WORKER}/create-subscription`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({plan, email:createdUser.email, userId:createdUser.uid})
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+
+    const {error: confirmErr} = await stripe.confirmCardPayment(data.clientSecret,{
+      payment_method:{card:cardElement}
+    });
+    if(confirmErr) throw new Error(confirmErr.message);
+
+    goSuccess(plan);
+
+  }catch(e){
+    showMsg("msgBox2","Payment error: "+e.message,"error");
+    setBtn("btnPay","Try again →", false);
+  }
+}
+
+document.getElementById("btnSkip").addEventListener("click", ()=>goSuccess("free"));
+
+// ── Success ──────────────────────────────────────────────────────
+function goSuccess(activePlan){
+  document.getElementById("step1").style.display = "none";
+  document.getElementById("step2").style.display = "none";
+  document.getElementById("stepsBar").style.display = "none";
+  document.getElementById("step3").style.display = "block";
+
+  const planLabel = activePlan==="premium"?"Premium":activePlan==="pro"?"Pro":"Free";
+  document.getElementById("successMsg").innerHTML =
+    `Your <strong style="color:#22C55E">${planLabel}</strong> account is ready! ` +
+    `We sent a verification link to your email. Check your inbox before signing in.`;
+}
+</script>
+</body>
+</html>
