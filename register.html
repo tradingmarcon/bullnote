@@ -8,204 +8,321 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
   import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyBK5g8DCYgS7AHnELc17xX8CNG3zalFuqo",
-    authDomain: "dmarcontrading.firebaseapp.com",
-    projectId: "dmarcontrading",
-    storageBucket: "dmarcontrading.firebasestorage.app",
-    messagingSenderId: "211444944842",
-    appId: "1:211444944842:web:2d4da843a09876be810933"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-  const auth = getAuth(app);
-  window._fb = { db, auth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, signOut, doc, setDoc };
+  import { getAuth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+  const cfg={apiKey:"AIzaSyBK5g8DCYgS7AHnELc17xX8CNG3zalFuqo",authDomain:"dmarcontrading.firebaseapp.com",projectId:"dmarcontrading",storageBucket:"dmarcontrading.firebasestorage.app",messagingSenderId:"211444944842",appId:"1:211444944842:web:2d4da843a09876be810933"};
+  const app=initializeApp(cfg);
+  window._fb={db:getFirestore(app),auth:getAuth(app),createUserWithEmailAndPassword,updateProfile,sendEmailVerification,doc,setDoc};
   window.dispatchEvent(new Event("fbReady"));
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;font-family:'Barlow Condensed',sans-serif;}
-  body{background:#0b0f1a;min-height:100vh;display:flex;flex-direction:column;color:#fff;}
-  ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#0b0f1a;} ::-webkit-scrollbar-thumb{background:#1e2535;border-radius:4px;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Montserrat',sans-serif;}
+:root{--bg:#080c14;--surface:#0d1220;--card:#111827;--border:#1c2a3d;--border-hi:#253549;--text:#f1f5f9;--muted:#4b617a;--sub:#64748b;--green:#22C55E;--blue:#3b82f6;--amber:#f59e0b;}
+body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
+::-webkit-scrollbar{width:4px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes riseUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 40px;border-bottom:1px solid #1a2035;}
-  .topbar img{height:64px;}
-  .topbar a{color:#64748b;font-size:14px;font-weight:600;text-decoration:none;transition:color 0.2s;}
-  .topbar a:hover{color:#22C55E;}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:70px;background:rgba(8,12,20,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+.topbar img{height:52px;}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+.topbar-hint{font-size:13px;color:var(--muted);font-weight:500;}
+.topbar-cta{background:transparent;border:1px solid var(--border-hi);border-radius:8px;padding:8px 18px;color:var(--text);font-size:13px;font-weight:700;text-decoration:none;letter-spacing:0.03em;transition:all 0.2s;}
+.topbar-cta:hover{border-color:var(--green);color:var(--green);}
 
-  .wrap{flex:1;display:flex;align-items:stretch;min-height:calc(100vh - 69px);}
+.main{display:flex;min-height:100vh;padding-top:70px;}
 
-  /* LEFT PANEL */
-  .left{width:420px;flex-shrink:0;background:linear-gradient(160deg,#0f1724 0%,#0b1320 100%);border-right:1px solid #1a2035;padding:48px 40px;display:flex;flex-direction:column;justify-content:space-between;}
-  .plan-badge{display:inline-flex;align-items:center;gap:8px;background:#22C55E18;border:1px solid #22C55E40;borderRadius:100px;padding:6px 14px;font-size:12px;font-weight:700;color:#22C55E;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:28px;}
-  .plan-name{font-size:42px;font-weight:900;line-height:1.1;margin-bottom:8px;}
-  .plan-price{font-size:24px;font-weight:700;color:#64748b;margin-bottom:32px;}
-  .plan-price span{font-size:44px;font-weight:900;background:linear-gradient(135deg,#22C55E,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
-  .features{display:flex;flex-direction:column;gap:10px;margin-bottom:40px;}
-  .feat{display:flex;align-items:center;gap:10px;font-size:15px;color:#cbd5e1;font-weight:600;}
-  .feat .check{width:20px;height:20px;border-radius:50%;background:#22C55E20;border:1px solid #22C55E60;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  .feat .check svg{width:10px;height:10px;stroke:#22C55E;fill:none;stroke-width:2.5;}
-  .feat.locked{color:#334155;}
-  .feat.locked .check{background:#1e2535;border-color:#2a3548;}
-  .feat.locked .check svg{stroke:#334155;}
-  .secure{display:flex;align-items:center;gap:8px;font-size:12px;color:#475569;margin-top:auto;}
+/* LEFT */
+.left{width:460px;flex-shrink:0;position:sticky;top:70px;height:calc(100vh - 70px);overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(160deg,#090e1b 0%,var(--bg) 100%);border-right:1px solid var(--border);}
+.left-bg{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:44px 44px;opacity:0.2;}
+.glow1{position:absolute;top:-120px;left:-100px;width:440px;height:440px;background:radial-gradient(circle,#22C55E14,transparent 70%);pointer-events:none;}
+.glow2{position:absolute;bottom:-80px;right:-60px;width:320px;height:320px;background:radial-gradient(circle,#3b82f614,transparent 70%);pointer-events:none;}
+.left-inner{position:relative;z-index:1;padding:36px 36px 28px;display:flex;flex-direction:column;height:100%;overflow-y:auto;}
 
-  /* RIGHT PANEL */
-  .right{flex:1;display:flex;align-items:center;justify-content:center;padding:48px 40px;}
-  .form-box{width:100%;max-width:440px;}
+.plan-chip{display:inline-flex;align-items:center;gap:7px;background:#22C55E10;border:1px solid #22C55E30;border-radius:100px;padding:5px 14px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:20px;width:fit-content;}
+.plan-chip svg{width:11px;height:11px;stroke:var(--green);fill:none;stroke-width:2.5;}
+.plan-title{font-size:32px;font-weight:900;letter-spacing:-0.02em;margin-bottom:4px;}
+.plan-title em{font-style:normal;background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.plan-price-row{display:flex;align-items:baseline;gap:4px;margin-bottom:24px;}
+.price-big{font-size:44px;font-weight:900;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.price-period{font-size:13px;font-weight:600;color:var(--muted);}
 
-  /* Steps */
-  .steps{display:flex;align-items:center;gap:0;margin-bottom:40px;}
-  .step{display:flex;align-items:center;gap:8px;}
-  .step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;transition:all 0.3s;}
-  .step-num.active{background:linear-gradient(135deg,#22C55E,#3b82f6);color:#fff;}
-  .step-num.done{background:#22C55E20;color:#22C55E;border:1px solid #22C55E40;}
-  .step-num.pending{background:#1e2535;color:#475569;}
-  .step-label{font-size:13px;font-weight:700;transition:color 0.3s;}
-  .step-label.active{color:#fff;}
-  .step-label.done{color:#22C55E;}
-  .step-label.pending{color:#475569;}
-  .step-line{flex:1;height:1px;background:#1e2535;margin:0 12px;}
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;}
+.stat{background:rgba(255,255,255,0.025);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;}
+.stat-num{font-size:20px;font-weight:800;background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.stat-lbl{font-size:9px;font-weight:600;color:var(--muted);letter-spacing:0.07em;text-transform:uppercase;margin-top:3px;}
 
-  .form-title{font-size:30px;font-weight:900;color:#fff;margin-bottom:6px;}
-  .form-sub{font-size:14px;color:#64748b;margin-bottom:28px;}
+.features{display:flex;flex-direction:column;gap:6px;margin-bottom:20px;}
+.feat{display:flex;align-items:center;gap:10px;font-size:12px;color:#94a3b8;font-weight:500;padding:8px 10px;border-radius:9px;background:rgba(255,255,255,0.015);border:1px solid transparent;transition:all 0.2s;}
+.feat.ok{border-color:rgba(34,197,94,0.1);}
+.feat.locked{opacity:0.35;}
+.feat-ico{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.feat.ok .feat-ico{background:#22C55E12;}
+.feat.locked .feat-ico{background:#1c2a3d;}
+.feat-ico svg{width:13px;height:13px;stroke-width:2;fill:none;}
+.feat.ok .feat-ico svg{stroke:var(--green);}
+.feat.locked .feat-ico svg{stroke:var(--muted);}
 
-  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
-  .field label{font-size:12px;font-weight:700;color:#64748b;letter-spacing:0.06em;text-transform:uppercase;}
-  .field input{background:#0f1724;border:1px solid #1e2d45;border-radius:12px;padding:13px 16px;font-size:15px;color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:600;outline:none;transition:border-color 0.2s;}
-  .field input:focus{border-color:#22C55E60;}
-  .field input::placeholder{color:#334155;}
+.testimonial{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:13px;padding:14px 16px;margin-bottom:12px;}
+.testimonial p{font-size:12px;color:#94a3b8;font-style:italic;line-height:1.65;margin-bottom:10px;font-weight:500;}
+.t-author{display:flex;align-items:center;gap:8px;}
+.t-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--blue));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex-shrink:0;}
+.t-name{font-size:12px;font-weight:700;color:var(--text);}
+.t-role{font-size:10px;color:var(--muted);}
+.t-stars{display:flex;gap:2px;margin-left:auto;}
+.t-stars svg{width:10px;height:10px;fill:var(--amber);}
 
-  .btn-primary{width:100%;background:linear-gradient(135deg,#22C55E,#3b82f6);color:#fff;border:none;border-radius:12px;padding:15px;font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:800;cursor:pointer;transition:opacity 0.2s;letter-spacing:0.03em;margin-top:8px;}
-  .btn-primary:hover{opacity:0.92;}
-  .btn-primary:disabled{background:#1e2535;cursor:not-allowed;opacity:0.6;}
+.secure-badge{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,255,255,0.015);border:1px solid var(--border);border-radius:9px;}
+.secure-badge svg{width:13px;height:13px;stroke:var(--muted);fill:none;stroke-width:2;flex-shrink:0;}
+.secure-badge span{font-size:10px;color:var(--muted);font-weight:500;line-height:1.5;}
 
-  .msg{padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;margin-bottom:16px;line-height:1.5;}
-  .msg.error{background:#ef444415;border:1px solid #ef444440;color:#ef4444;}
-  .msg.success{background:#22c55e15;border:1px solid #22c55e40;color:#22c55e;}
+/* RIGHT */
+.right{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:52px 56px;overflow-y:auto;}
+.form-box{width:100%;max-width:460px;}
 
-  /* Card element */
-  .card-wrap{background:#0f1724;border:1px solid #1e2d45;border-radius:12px;padding:14px 16px;margin-bottom:16px;transition:border-color 0.2s;}
-  .card-wrap:focus-within{border-color:#22C55E60;}
+.steps{display:flex;align-items:center;margin-bottom:40px;}
+.s-item{display:flex;align-items:center;gap:9px;}
+.s-circle{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;letter-spacing:0;transition:all 0.35s;flex-shrink:0;}
+.s-circle.active{background:linear-gradient(135deg,var(--green),var(--blue));color:#fff;box-shadow:0 0 18px #22C55E35;}
+.s-circle.done{background:#22C55E12;color:var(--green);border:1px solid #22C55E35;}
+.s-circle.done svg{width:13px;height:13px;stroke:var(--green);fill:none;stroke-width:2.5;}
+.s-circle.idle{background:var(--card);color:var(--muted);border:1px solid var(--border);}
+.s-lbl{font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;}
+.s-lbl.active{color:var(--text);}
+.s-lbl.done{color:var(--green);}
+.s-lbl.idle{color:var(--muted);}
+.s-sub{font-size:10px;font-weight:500;color:var(--muted);}
+.s-line{flex:1;height:1px;margin:0 14px;background:var(--border);position:relative;overflow:hidden;}
+.s-fill{position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,var(--green),var(--blue));transition:width 0.5s ease;}
 
-  /* Success screen */
-  .success-screen{text-align:center;animation:fadeUp 0.5s ease;}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+.f-title{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px;}
+.f-sub{font-size:13px;font-weight:500;color:var(--sub);margin-bottom:28px;line-height:1.6;}
 
-  /* Responsive */
-  @media(max-width:780px){
-    .left{display:none;}
-    .topbar{padding:16px 20px;}
-    .right{padding:24px 20px;}
-  }
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.col2{grid-column:1/-1;}
+.field{display:flex;flex-direction:column;gap:6px;}
+.field label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;}
+.fw{position:relative;}
+.fw svg.fi{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2;pointer-events:none;}
+.fw input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 12px 12px 40px;font-size:13px;font-weight:500;color:var(--text);font-family:'Montserrat',sans-serif;outline:none;transition:border-color 0.2s,box-shadow 0.2s;}
+.fw input:focus{border-color:#22C55E45;box-shadow:0 0 0 3px #22C55E0d;}
+.fw input::placeholder{color:var(--muted);}
+.eye-btn{position:absolute;right:13px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;display:flex;align-items:center;padding:0;color:var(--muted);transition:color 0.2s;}
+.eye-btn:hover{color:var(--sub);}
+.eye-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;}
+
+.pw-bars{display:flex;gap:3px;margin-top:5px;}
+.pw-bar{flex:1;height:3px;border-radius:2px;background:var(--border);transition:background 0.3s;}
+
+.msg{padding:11px 14px;border-radius:9px;font-size:12px;font-weight:600;margin-bottom:14px;line-height:1.5;display:flex;align-items:flex-start;gap:9px;animation:fadeIn 0.2s ease;}
+.msg svg{width:15px;height:15px;flex-shrink:0;margin-top:1px;fill:none;stroke-width:2;}
+.msg.error{background:#ef444410;border:1px solid #ef444430;color:#ef4444;}
+.msg.error svg{stroke:#ef4444;}
+.msg.success{background:#22c55e10;border:1px solid #22c55e30;color:#22c55e;}
+.msg.success svg{stroke:#22c55e;}
+
+.btn-p{width:100%;background:linear-gradient(135deg,var(--green),var(--blue));color:#fff;border:none;border-radius:11px;padding:14px;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 0.2s,transform 0.15s;letter-spacing:0.03em;margin-top:18px;display:flex;align-items:center;justify-content:center;gap:9px;}
+.btn-p:hover:not(:disabled){opacity:0.9;transform:translateY(-1px);}
+.btn-p:disabled{background:#1a2535;color:var(--muted);cursor:not-allowed;transform:none;}
+.btn-p svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2.5;}
+
+.btn-ghost{width:100%;background:transparent;border:none;color:var(--muted);font-size:12px;font-family:'Montserrat',sans-serif;font-weight:600;cursor:pointer;margin-top:10px;padding:7px;text-decoration:underline;text-underline-offset:3px;transition:color 0.2s;}
+.btn-ghost:hover{color:var(--sub);}
+
+.trust-row{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:12px;}
+.trust{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-weight:600;}
+.trust svg{width:12px;height:12px;stroke:var(--muted);fill:none;stroke-width:2;}
+
+.pay-box{background:linear-gradient(135deg,#22C55E06,#3b82f606);border:1px solid #22C55E1a;border-radius:13px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;}
+.pay-box-name{font-size:15px;font-weight:800;}
+.pay-box-desc{font-size:11px;color:var(--sub);font-weight:500;margin-top:2px;}
+.pay-box-price{font-size:26px;font-weight:900;background:linear-gradient(135deg,var(--green),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+.card-wrap{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin-bottom:4px;transition:border-color 0.2s;}
+.card-wrap:focus-within{border-color:#22C55E45;box-shadow:0 0 0 3px #22C55E0d;}
+.card-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:10px;}
+
+.success-wrap{text-align:center;animation:riseUp 0.5s cubic-bezier(0.22,1,0.36,1);}
+.success-ico{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#22C55E1a,#3b82f61a);border:2px solid #22C55E35;display:flex;align-items:center;justify-content:center;margin:0 auto 22px;}
+.success-ico svg{width:34px;height:34px;stroke:var(--green);fill:none;stroke-width:2;}
+.uname-box{background:linear-gradient(135deg,#22C55E08,#3b82f608);border:1px solid #22C55E20;border-radius:13px;padding:18px 22px;margin:22px 0;text-align:left;}
+.uname-label{font-size:9px;font-weight:700;color:var(--green);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:7px;}
+.uname-val{font-size:24px;font-weight:800;color:var(--text);font-family:'Courier New',monospace;letter-spacing:0.04em;}
+.uname-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;font-weight:500;}
+.email-box{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:flex-start;gap:11px;text-align:left;}
+.email-box svg{width:17px;height:17px;stroke:var(--green);fill:none;stroke-width:2;flex-shrink:0;margin-top:1px;}
+.email-box p{font-size:12px;color:var(--sub);font-weight:500;line-height:1.6;}
+
+@media(max-width:880px){.left{display:none;}.right{padding:28px 20px;}.grid2{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <a href="index.html"><img src="image_dark.png" id="topLogo" alt="BullNote"/></a>
-  <a href="app.html">Already have an account? Sign in →</a>
+  <a href="index.html"><img src="image_dark.png" alt="BullNote"/></a>
+  <div class="topbar-right">
+    <span class="topbar-hint">Already have an account?</span>
+    <a href="app.html" class="topbar-cta">Sign In</a>
+  </div>
 </div>
 
-<div class="wrap">
-  <!-- LEFT: Plan summary -->
-  <div class="left" id="leftPanel">
-    <div>
-      <div class="plan-badge" id="planBadge">✦ Selected Plan</div>
-      <div class="plan-name" id="planName">BullNote Pro</div>
-      <div class="plan-price">Just <span id="planPrice">$16.99</span>/month</div>
-      <div class="features" id="featureList"></div>
-    </div>
-    <div class="secure">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      Secure checkout · Powered by Stripe · Cancel anytime
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="left">
+    <div class="left-bg"></div><div class="glow1"></div><div class="glow2"></div>
+    <div class="left-inner">
+      <div class="plan-chip">
+        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        <span id="chipTxt">Pro Plan</span>
+      </div>
+      <div class="plan-title">BullNote <em id="planSpan">Pro</em></div>
+      <div class="plan-price-row">
+        <div class="price-big" id="priceBig">$16.99</div>
+        <div class="price-period">/month</div>
+      </div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-num">2.4k+</div><div class="stat-lbl">Traders</div></div>
+        <div class="stat"><div class="stat-num">98%</div><div class="stat-lbl">Satisfied</div></div>
+        <div class="stat"><div class="stat-num">4.9</div><div class="stat-lbl">Rating</div></div>
+      </div>
+      <div class="features" id="featList"></div>
+      <div class="testimonial">
+        <p>"BullNote completely changed how I approach my trading. Tracking psychology was a game changer — I cut losing trades by 40%."</p>
+        <div class="t-author">
+          <div class="t-avatar">JR</div>
+          <div><div class="t-name">Jason R.</div><div class="t-role">Futures Trader</div></div>
+          <div class="t-stars">
+            <svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            <svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            <svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            <svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+            <svg viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="secure-badge">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>256-bit SSL encryption · Powered by Stripe · Cancel anytime</span>
+      </div>
     </div>
   </div>
 
-  <!-- RIGHT: Form -->
+  <!-- RIGHT -->
   <div class="right">
     <div class="form-box">
 
-      <!-- Steps indicator -->
       <div class="steps" id="stepsBar">
-        <div class="step">
-          <div class="step-num active" id="s1num">1</div>
-          <div class="step-label active" id="s1lbl">Account</div>
+        <div class="s-item">
+          <div class="s-circle active" id="s1c">1</div>
+          <div><div class="s-lbl active" id="s1l">Account</div><div class="s-sub">Your details</div></div>
         </div>
-        <div class="step-line" id="line1"></div>
-        <div class="step">
-          <div class="step-num pending" id="s2num">2</div>
-          <div class="step-label pending" id="s2lbl">Payment</div>
+        <div class="s-line" id="sline"><div class="s-fill" id="sfill"></div></div>
+        <div class="s-item" id="s2wrap">
+          <div class="s-circle idle" id="s2c">2</div>
+          <div><div class="s-lbl idle" id="s2l">Payment</div><div class="s-sub">Secure checkout</div></div>
         </div>
       </div>
 
-      <!-- STEP 1: Account details -->
+      <!-- STEP 1 -->
       <div id="step1">
-        <div class="form-title">Create your account</div>
-        <div class="form-sub" id="step1Sub">Start your journey with BullNote.</div>
-
-        <div id="msgBox1"></div>
-
-        <div class="field">
-          <label>Full name</label>
-          <input type="text" id="inp_name" placeholder="Daniel Marcon" autocomplete="name"/>
+        <div class="f-title">Create your account</div>
+        <div class="f-sub" id="s1sub">Join BullNote and start trading smarter today.</div>
+        <div id="msg1"></div>
+        <div class="grid2">
+          <div class="field col2">
+            <label>Full name</label>
+            <div class="fw">
+              <svg class="fi" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="iName" placeholder="Your full name" autocomplete="name"/>
+            </div>
+          </div>
+          <div class="field col2">
+            <label>Email address</label>
+            <div class="fw">
+              <svg class="fi" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="iEmail" placeholder="you@email.com" autocomplete="email"/>
+            </div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="fw">
+              <svg class="fi" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="iPw" placeholder="Min. 6 characters" autocomplete="new-password"/>
+              <button class="eye-btn" type="button" onclick="tglPw('iPw')">
+                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <div class="pw-bars"><div class="pw-bar" id="pb1"></div><div class="pw-bar" id="pb2"></div><div class="pw-bar" id="pb3"></div><div class="pw-bar" id="pb4"></div></div>
+          </div>
+          <div class="field">
+            <label>Confirm password</label>
+            <div class="fw">
+              <svg class="fi" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="iPw2" placeholder="Repeat password" autocomplete="new-password"/>
+              <button class="eye-btn" type="button" onclick="tglPw('iPw2')">
+                <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label>Email address</label>
-          <input type="email" id="inp_email" placeholder="you@email.com" autocomplete="email"/>
-        </div>
-        <div class="field">
-          <label>Password</label>
-          <input type="password" id="inp_pw" placeholder="Min. 6 characters" autocomplete="new-password"/>
-        </div>
-        <div class="field">
-          <label>Confirm password</label>
-          <input type="password" id="inp_pw2" placeholder="Repeat password" autocomplete="new-password"/>
-        </div>
-
-        <button class="btn-primary" id="btn1">Continue →</button>
-
-        <div style="text-align:center;margin-top:16px;font-size:13px;color:#475569;">
-          By creating an account you agree to our <a href="#" style="color:#22C55E;text-decoration:none;">Terms</a>.
-        </div>
-      </div>
-
-      <!-- STEP 2: Payment (only for paid plans) -->
-      <div id="step2" style="display:none;">
-        <div class="form-title">Complete payment</div>
-        <div class="form-sub">Enter your card details to activate your plan.</div>
-
-        <div id="msgBox2"></div>
-
-        <div class="card-wrap" id="cardMount"></div>
-
-        <button class="btn-primary" id="btnPay">Pay & Activate →</button>
-
-        <button id="btnSkip" style="width:100%;background:none;border:none;color:#475569;font-size:13px;font-family:'Barlow Condensed',sans-serif;font-weight:600;cursor:pointer;margin-top:12px;text-decoration:underline;padding:4px;">
-          Skip for now — use Free plan
+        <button class="btn-p" id="btn1" onclick="doRegister()">
+          <span>Continue</span>
+          <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </button>
+        <div class="trust-row" style="margin-top:18px;">
+          <div class="trust"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>No spam</div>
+          <div class="trust"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Secure</div>
+          <div class="trust"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Free to start</div>
+        </div>
+        <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--muted);font-weight:500;line-height:1.6;">
+          By continuing you agree to our <a href="#" style="color:var(--green);text-decoration:none;font-weight:700;">Terms of Service</a> and <a href="#" style="color:var(--green);text-decoration:none;font-weight:700;">Privacy Policy</a>.
+        </p>
+      </div>
 
-        <div style="text-align:center;margin-top:12px;font-size:11px;color:#334155;">
-          🔒 Your card info is encrypted via Stripe. We never store card details.
+      <!-- STEP 2 -->
+      <div id="step2" style="display:none;">
+        <div class="f-title">Complete payment</div>
+        <div class="f-sub">Your account is ready. Activate your plan below.</div>
+        <div class="pay-box">
+          <div><div class="pay-box-name" id="payName">BullNote Pro</div><div class="pay-box-desc">Billed monthly · Cancel anytime</div></div>
+          <div class="pay-box-price" id="payPrice">$16.99</div>
+        </div>
+        <div id="msg2"></div>
+        <div class="card-label">Card details</div>
+        <div class="card-wrap" id="cardMount"></div>
+        <button class="btn-p" id="btnPay" disabled onclick="doPay()">
+          <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span>Pay &amp; Activate Plan</span>
+        </button>
+        <button class="btn-ghost" onclick="goSuccess('free')">Skip — continue with Free plan</button>
+        <div class="trust-row" style="margin-top:14px;">
+          <div class="trust"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>256-bit SSL</div>
+          <div class="trust"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Stripe secured</div>
+          <div class="trust"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Cancel anytime</div>
         </div>
       </div>
 
-      <!-- STEP 3: Success -->
-      <div id="step3" style="display:none;" class="success-screen">
-        <div style="font-size:72px;margin-bottom:16px;">🎉</div>
-        <div style="font-size:32px;font-weight:900;color:#fff;margin-bottom:8px;">You're all set!</div>
-        <div style="font-size:15px;color:#64748b;line-height:1.6;margin-bottom:32px;" id="successMsg">
-          Your account has been created. Check your email to verify your address.
+      <!-- STEP 3 -->
+      <div id="step3" style="display:none;" class="success-wrap">
+        <div class="success-ico"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div style="font-size:28px;font-weight:800;letter-spacing:-0.02em;margin-bottom:8px;">You're all set!</div>
+        <div style="font-size:13px;color:var(--sub);line-height:1.7;font-weight:500;margin-bottom:0;" id="sucMsg">Your account has been created.</div>
+        <div class="uname-box">
+          <div class="uname-label">Your username</div>
+          <div class="uname-val" id="unameVal"></div>
+          <div class="uname-hint">Save this — you'll need it to recover your password if you forget it.</div>
         </div>
-        <div style="background:#22C55E15;border:1px solid #22C55E40;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
-          <div style="font-size:11px;font-weight:700;color:#22C55E;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">🎉 Your username</div>
-          <div style="font-size:28px;font-weight:900;color:#fff;font-family:monospace;" id="usernameBox"></div>
-          <div style="font-size:12px;color:#64748b;margin-top:6px;">Save this to recover your password if you forget it.</div>
+        <div class="email-box">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <p>We sent a <strong style="color:var(--text);">verification link</strong> to your email. Click it to activate your account before signing in.</p>
         </div>
-        <a href="app.html" class="btn-primary" style="display:block;text-align:center;text-decoration:none;">Go to Dashboard →</a>
+        <a href="app.html" class="btn-p" style="text-decoration:none;">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
+          Go to Dashboard
+        </a>
       </div>
 
     </div>
@@ -213,214 +330,136 @@
 </div>
 
 <script>
-const params   = new URLSearchParams(location.search);
-const plan     = params.get("plan") || "free"; // "free"|"pro"|"premium"
-const isPaid   = plan === "pro" || plan === "premium";
-const WORKER   = "https://bullnote-payments.tradingmarcon.workers.dev";
-const PK       = "pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K";
+const params=new URLSearchParams(location.search),plan=params.get("plan")||"free",isPaid=plan==="pro"||plan==="premium";
+const WORKER="https://bullnote-payments.tradingmarcon.workers.dev";
+const PK="pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K";
 
-// ── Populate left panel ──────────────────────────────────────────
-const PLANS = {
-  free: {
-    name:"BullNote Free", price:"$0", badge:"🆓 Free Plan",
-    features:[
-      {t:"Trade Journal — 15 trades/month", ok:true},
-      {t:"Performance Dashboard", ok:true},
-      {t:"Discipline Score", ok:true},
-      {t:"Trade Rating (⭐ 1–5)", ok:true},
-      {t:"Trading Calendar", ok:false},
-      {t:"Strategy Analysis", ok:false},
-      {t:"AI Psychology Analysis", ok:false},
-    ]
-  },
-  pro: {
-    name:"BullNote Pro", price:"$16.99", badge:"🚀 Pro Plan",
-    features:[
-      {t:"Trade Journal — unlimited trades", ok:true},
-      {t:"Performance Dashboard", ok:true},
-      {t:"Discipline Score", ok:true},
-      {t:"Trade Rating (⭐ 1–5)", ok:true},
-      {t:"Trading Calendar", ok:true},
-      {t:"Strategy Analysis", ok:true},
-      {t:"Multi-language (EN/PT/ES)", ok:true},
-    ]
-  },
-  premium: {
-    name:"BullNote Premium", price:"$24.99", badge:"⭐ Premium Plan",
-    features:[
-      {t:"Trade Journal — unlimited trades", ok:true},
-      {t:"Performance Dashboard", ok:true},
-      {t:"Discipline Score", ok:true},
-      {t:"Trade Rating (⭐ 1–5)", ok:true},
-      {t:"Trading Calendar", ok:true},
-      {t:"Strategy Analysis", ok:true},
-      {t:"AI Psychology Analysis", ok:true},
-      {t:"Weekly Report", ok:true},
-      {t:"Priority Support", ok:true},
-    ]
-  }
+const ICONS={
+  journal:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  chart:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  shield:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`,
+  star:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>`,
+  cal:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  search:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  globe:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+  brain:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.54-4.58A2.5 2.5 0 0 1 4 12a2.5 2.5 0 0 1 1.5-2.27A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.54-4.58A2.5 2.5 0 0 0 20 12a2.5 2.5 0 0 0-1.5-2.27A2.5 2.5 0 0 0 14.5 2z"/></svg>`,
+  report:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="12" y1="17" x2="8" y2="17"/></svg>`,
+  support:`<svg viewBox="0 0 24 24" stroke-width="2" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
 };
 
-const pd = PLANS[plan];
-document.getElementById("planBadge").textContent = pd.badge;
-document.getElementById("planName").textContent  = pd.name;
-document.getElementById("planPrice").textContent = pd.price;
-const fl = document.getElementById("featureList");
+const PLANS={
+  free:{chip:"Free Plan",span:"Free",price:"$0",features:[{t:"Trade Journal — 15 trades/month",ok:true,i:"journal"},{t:"Performance Dashboard",ok:true,i:"chart"},{t:"Discipline Score",ok:true,i:"shield"},{t:"Trade Rating (1–5 stars)",ok:true,i:"star"},{t:"Trading Calendar",ok:false,i:"cal"},{t:"Strategy Analysis",ok:false,i:"search"},{t:"AI Psychology Analysis",ok:false,i:"brain"}]},
+  pro:{chip:"Pro Plan",span:"Pro",price:"$16.99",features:[{t:"Trade Journal — unlimited trades",ok:true,i:"journal"},{t:"Performance Dashboard",ok:true,i:"chart"},{t:"Discipline Score",ok:true,i:"shield"},{t:"Trade Rating (1–5 stars)",ok:true,i:"star"},{t:"Trading Calendar",ok:true,i:"cal"},{t:"Strategy Analysis",ok:true,i:"search"},{t:"Multi-language (EN/PT/ES)",ok:true,i:"globe"}]},
+  premium:{chip:"Premium Plan",span:"Premium",price:"$24.99",features:[{t:"Trade Journal — unlimited trades",ok:true,i:"journal"},{t:"Performance Dashboard",ok:true,i:"chart"},{t:"Discipline Score",ok:true,i:"shield"},{t:"Trade Rating (1–5 stars)",ok:true,i:"star"},{t:"Trading Calendar",ok:true,i:"cal"},{t:"Strategy Analysis",ok:true,i:"search"},{t:"AI Psychology Analysis",ok:true,i:"brain"},{t:"Weekly Performance Report",ok:true,i:"report"},{t:"Priority Support",ok:true,i:"support"}]},
+};
+
+const pd=PLANS[plan];
+document.getElementById("chipTxt").textContent=pd.chip;
+document.getElementById("planSpan").textContent=pd.span;
+document.getElementById("priceBig").textContent=pd.price;
+document.getElementById("payName").textContent="BullNote "+pd.span;
+document.getElementById("payPrice").textContent=pd.price+(plan==="free"?"":" /mo");
+const fl=document.getElementById("featList");
 pd.features.forEach(f=>{
-  fl.innerHTML += `<div class="feat${f.ok?"":" locked"}">
-    <div class="check"><svg viewBox="0 0 12 10"><polyline points="1,5 4,9 11,1"/></svg></div>
-    ${f.t}
-  </div>`;
+  const d=document.createElement("div");
+  d.className="feat "+(f.ok?"ok":"locked");
+  d.innerHTML=`<div class="feat-ico">${ICONS[f.i]}</div><span>${f.t}</span>`;
+  fl.appendChild(d);
 });
-
-// If free plan, hide step 2 in steps bar
 if(!isPaid){
-  document.getElementById("line1").style.display="none";
-  document.getElementById("s2num").style.display="none";
-  document.getElementById("s2lbl").style.display="none";
-  document.getElementById("step1Sub").textContent = "Create your free BullNote account.";
+  document.getElementById("sline").style.display="none";
+  document.getElementById("s2wrap").style.display="none";
+  document.getElementById("s1sub").textContent="Create your free BullNote account.";
 }
 
-// ── Step 1: Account creation ─────────────────────────────────────
-let createdUser = null;
-
-function showMsg(boxId, text, type){
-  const b = document.getElementById(boxId);
-  b.innerHTML = text ? `<div class="msg ${type}">${text}</div>` : "";
-}
-
-function setBtn(id, text, disabled){
-  const b = document.getElementById(id);
-  b.textContent = text;
-  b.disabled = disabled;
-}
-
-document.getElementById("btn1").addEventListener("click", doRegister);
-["inp_name","inp_email","inp_pw","inp_pw2"].forEach(id=>{
-  document.getElementById(id).addEventListener("keydown", e=>{ if(e.key==="Enter") doRegister(); });
+// Password strength
+document.getElementById("iPw").addEventListener("input",e=>{
+  const v=e.target.value,s=[v.length>=6,v.length>=10,/[A-Z0-9]/.test(v),/[^a-zA-Z0-9]/.test(v)],c=s.filter(Boolean).length;
+  const cols=["#ef4444","#f59e0b","#3b82f6","#22C55E"];
+  ["pb1","pb2","pb3","pb4"].forEach((id,i)=>document.getElementById(id).style.background=i<c?cols[c-1]:"var(--border)");
 });
+
+function tglPw(id){const i=document.getElementById(id);i.type=i.type==="password"?"text":"password";}
+
+function showMsg(id,html,type){
+  document.getElementById(id).innerHTML=html?`<div class="msg ${type}"><svg viewBox="0 0 24 24">${type==="error"?'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>':'<polyline points="20 6 9 17 4 12"/>'}</svg><span>${html}</span></div>`:"";
+}
+
+let createdUser=null;
+["iName","iEmail","iPw","iPw2"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")doRegister();}));
 
 async function doRegister(){
-  const name  = document.getElementById("inp_name").value.trim();
-  const email = document.getElementById("inp_email").value.trim();
-  const pw    = document.getElementById("inp_pw").value;
-  const pw2   = document.getElementById("inp_pw2").value;
-
-  if(!name)          return showMsg("msgBox1","Please enter your full name.","error");
-  if(!email)         return showMsg("msgBox1","Please enter your email.","error");
-  if(pw.length < 6)  return showMsg("msgBox1","Password must be at least 6 characters.","error");
-  if(pw !== pw2)     return showMsg("msgBox1","Passwords do not match.","error");
-
-  showMsg("msgBox1","","");
-  setBtn("btn1","⏳ Creating account...", true);
-
-  // Wait for Firebase
-  await new Promise(res=>{ if(window._fb) return res(); window.addEventListener("fbReady", res, {once:true}); });
-  const {db, auth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification, doc, setDoc} = window._fb;
-
+  const name=document.getElementById("iName").value.trim(),email=document.getElementById("iEmail").value.trim(),pw=document.getElementById("iPw").value,pw2=document.getElementById("iPw2").value;
+  if(!name)return showMsg("msg1","Please enter your full name.","error");
+  if(!email)return showMsg("msg1","Please enter your email address.","error");
+  if(pw.length<6)return showMsg("msg1","Password must be at least 6 characters.","error");
+  if(pw!==pw2)return showMsg("msg1","Passwords do not match.","error");
+  showMsg("msg1","","");
+  const b=document.getElementById("btn1");
+  b.disabled=true;b.innerHTML=`<svg style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;animation:spin 0.8s linear infinite;" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Creating account...</span>`;
+  await new Promise(r=>{if(window._fb)return r();window.addEventListener("fbReady",r,{once:true});});
+  const {db,auth,createUserWithEmailAndPassword,updateProfile,sendEmailVerification,doc,setDoc}=window._fb;
   try{
-    const base     = name.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12) || "trader";
-    const username = `${base}_${Math.random().toString(36).slice(2,6)}`;
-
-    const cred = await createUserWithEmailAndPassword(auth, email, pw);
-    await updateProfile(cred.user, {displayName: name});
-
-    // Save to Firestore
-    try{ await setDoc(doc(db,"usernames",username),{username,email,uid:cred.user.uid,createdAt:Date.now()}); }catch(e){}
-    try{ await setDoc(doc(db,`users/${cred.user.uid}/settings`,"profile"),{username,displayName:name,plan:"free"},{merge:true}); }catch(e){}
-
-    await sendEmailVerification(cred.user, {url: "https://bullnote.pages.dev/app.html"});
-
-    createdUser = cred.user;
-    document.getElementById("usernameBox").textContent = username;
-
+    const base=name.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)||"trader";
+    const uname=`${base}_${Math.random().toString(36).slice(2,6)}`;
+    const cred=await createUserWithEmailAndPassword(auth,email,pw);
+    await updateProfile(cred.user,{displayName:name});
+    try{await setDoc(doc(db,"usernames",uname),{username:uname,email,uid:cred.user.uid,createdAt:Date.now()});}catch(e){}
+    try{await setDoc(doc(db,`users/${cred.user.uid}/settings`,"profile"),{username:uname,displayName:name,plan:"free"},{merge:true});}catch(e){}
+    await sendEmailVerification(cred.user,{url:"https://bullnote.pages.dev/app.html"});
+    createdUser=cred.user;
+    document.getElementById("unameVal").textContent=uname;
     if(isPaid){
-      // Go to payment step
-      document.getElementById("step1").style.display = "none";
-      document.getElementById("step2").style.display = "block";
-      // Update steps UI
-      document.getElementById("s1num").className = "step-num done";
-      document.getElementById("s1num").innerHTML = `<svg width="12" height="12" viewBox="0 0 12 10" fill="none" stroke="#22C55E" stroke-width="2.5"><polyline points="1,5 4,9 11,1"/></svg>`;
-      document.getElementById("s1lbl").className = "step-label done";
-      document.getElementById("s2num").className = "step-num active";
-      document.getElementById("s2lbl").className = "step-label active";
+      document.getElementById("step1").style.display="none";
+      document.getElementById("step2").style.display="block";
+      document.getElementById("s1c").className="s-circle done";
+      document.getElementById("s1c").innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+      document.getElementById("s1l").className="s-lbl done";
+      document.getElementById("s2c").className="s-circle active";
+      document.getElementById("s2l").className="s-lbl active";
+      document.getElementById("sfill").style.width="100%";
       initStripe();
-    } else {
-      // Free plan — go straight to success
-      goSuccess("free");
-    }
-
+    }else{goSuccess("free");}
   }catch(e){
-    const msgs = {
-      "auth/email-already-in-use":"This email is already registered. <a href='app.html' style='color:#22C55E'>Sign in →</a>",
-      "auth/invalid-email":"Invalid email address.",
-      "auth/too-many-requests":"Too many attempts. Try again later.",
-    };
-    showMsg("msgBox1", msgs[e.code]||e.message, "error");
-    setBtn("btn1","Continue →", false);
+    const msgs={"auth/email-already-in-use":`Email already registered. <a href="app.html" style="color:var(--green);font-weight:700;">Sign in</a>`,"auth/invalid-email":"Invalid email address.","auth/too-many-requests":"Too many attempts. Try again later."};
+    showMsg("msg1",msgs[e.code]||e.message,"error");
+    b.disabled=false;b.innerHTML=`<span>Continue</span><svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2.5;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
   }
 }
 
-// ── Stripe ───────────────────────────────────────────────────────
-let stripe, cardElement;
-
+let stripe,cardEl;
 function initStripe(){
-  stripe = window.Stripe(PK);
-  const elements = stripe.elements();
-  cardElement = elements.create("card",{
-    style:{base:{fontFamily:"'Barlow Condensed',sans-serif",fontSize:"16px",color:"#ffffff","::placeholder":{color:"#475569"}}},
-    hidePostalCode:true
-  });
-  setTimeout(()=>{
-    cardElement.mount("#cardMount");
-    cardElement.on("change", e=>{
-      document.getElementById("btnPay").disabled = !e.complete;
-    });
-    document.getElementById("btnPay").disabled = true;
-  },150);
+  stripe=window.Stripe(PK);
+  const els=stripe.elements();
+  cardEl=els.create("card",{style:{base:{fontFamily:"'Montserrat',sans-serif",fontSize:"14px",fontWeight:"500",color:"#f1f5f9","::placeholder":{color:"#4b617a"}}},hidePostalCode:true});
+  setTimeout(()=>{cardEl.mount("#cardMount");cardEl.on("change",e=>{document.getElementById("btnPay").disabled=!e.complete;});},200);
 }
-
-document.getElementById("btnPay").addEventListener("click", doPay);
 
 async function doPay(){
-  if(!stripe||!cardElement||!createdUser) return;
-  showMsg("msgBox2","","");
-  setBtn("btnPay","⏳ Processing...", true);
-
+  if(!stripe||!cardEl||!createdUser)return;
+  showMsg("msg2","","");
+  const b=document.getElementById("btnPay");
+  b.disabled=true;b.innerHTML=`<svg style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;animation:spin 0.8s linear infinite;" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>Processing...</span>`;
   try{
-    const res = await fetch(`${WORKER}/create-subscription`,{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({plan, email:createdUser.email, userId:createdUser.uid})
-    });
-    const data = await res.json();
-    if(data.error) throw new Error(data.error);
-
-    const {error: confirmErr} = await stripe.confirmCardPayment(data.clientSecret,{
-      payment_method:{card:cardElement}
-    });
-    if(confirmErr) throw new Error(confirmErr.message);
-
+    const res=await fetch(`${WORKER}/create-subscription`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan,email:createdUser.email,userId:createdUser.uid})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+    const {error:ce}=await stripe.confirmCardPayment(data.clientSecret,{payment_method:{card:cardEl}});
+    if(ce)throw new Error(ce.message);
     goSuccess(plan);
-
   }catch(e){
-    showMsg("msgBox2","Payment error: "+e.message,"error");
-    setBtn("btnPay","Try again →", false);
+    showMsg("msg2","Payment failed: "+e.message,"error");
+    b.disabled=false;b.innerHTML=`<svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Try again</span>`;
   }
 }
 
-document.getElementById("btnSkip").addEventListener("click", ()=>goSuccess("free"));
-
-// ── Success ──────────────────────────────────────────────────────
-function goSuccess(activePlan){
-  document.getElementById("step1").style.display = "none";
-  document.getElementById("step2").style.display = "none";
-  document.getElementById("stepsBar").style.display = "none";
-  document.getElementById("step3").style.display = "block";
-
-  const planLabel = activePlan==="premium"?"Premium":activePlan==="pro"?"Pro":"Free";
-  document.getElementById("successMsg").innerHTML =
-    `Your <strong style="color:#22C55E">${planLabel}</strong> account is ready! ` +
-    `We sent a verification link to your email. Check your inbox before signing in.`;
+function goSuccess(p){
+  document.getElementById("step1").style.display="none";
+  document.getElementById("step2").style.display="none";
+  document.getElementById("stepsBar").style.display="none";
+  document.getElementById("step3").style.display="block";
+  const lbl=p==="premium"?"Premium":p==="pro"?"Pro":"Free";
+  document.getElementById("sucMsg").innerHTML=`Your <strong style="color:var(--green);font-weight:700;">${lbl}</strong> account is ready! Verify your email before signing in.`;
 }
 </script>
 </body>
