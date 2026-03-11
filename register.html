@@ -8,10 +8,10 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
   import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-  import { getAuth, createUserWithEmailAndPassword, updateProfile, sendEmailVerification } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendEmailVerification, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
   const cfg={apiKey:"AIzaSyBK5g8DCYgS7AHnELc17xX8CNG3zalFuqo",authDomain:"dmarcontrading.firebaseapp.com",projectId:"dmarcontrading",storageBucket:"dmarcontrading.firebasestorage.app",messagingSenderId:"211444944842",appId:"1:211444944842:web:2d4da843a09876be810933"};
   const app=initializeApp(cfg);
-  window._fb={db:getFirestore(app),auth:getAuth(app),createUserWithEmailAndPassword,updateProfile,sendEmailVerification,doc,setDoc};
+  window._fb={db:getFirestore(app),auth:getAuth(app),createUserWithEmailAndPassword,signInWithEmailAndPassword,updateProfile,sendEmailVerification,signOut,doc,setDoc};
   window.dispatchEvent(new Event("fbReady"));
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -309,9 +309,14 @@ body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
           <div class="s-circle active" id="s1c">1</div>
           <div><div class="s-lbl active" id="s1l">Account</div><div class="s-sub" id="t_yourDetails">Your details</div></div>
         </div>
-        <div class="s-line" id="sline"><div class="s-fill" id="sfill"></div></div>
-        <div class="s-item" id="s2wrap">
-          <div class="s-circle idle" id="s2c">2</div>
+        <div class="s-line" id="sline1"><div class="s-fill" id="sfill1"></div></div>
+        <div class="s-item" id="s15wrap">
+          <div class="s-circle idle" id="s15c">2</div>
+          <div><div class="s-lbl idle" id="s15l">Verify</div><div class="s-sub" id="t_verifyEmail2">Check email</div></div>
+        </div>
+        <div class="s-line" id="sline2" style="display:none;"><div class="s-fill" id="sfill2"></div></div>
+        <div class="s-item" id="s2wrap" style="display:none;">
+          <div class="s-circle idle" id="s2c">3</div>
           <div><div class="s-lbl idle" id="s2l">Payment</div><div class="s-sub" id="t_secureCheckout">Secure checkout</div></div>
         </div>
       </div>
@@ -485,6 +490,29 @@ body{background:var(--bg);min-height:100vh;color:var(--text);overflow-x:hidden;}
         <div style="height:40px;"></div>
       </div>
 
+      <!-- STEP 1.5 — EMAIL VERIFICATION GATE -->
+      <div id="step15" style="display:none;text-align:center;padding:20px 0;">
+        <div style="font-size:56px;margin-bottom:16px;">📧</div>
+        <div class="f-title" style="margin-bottom:8px;" id="t_verifyTitle">Check your inbox!</div>
+        <div class="f-sub" id="t_verifySub" style="margin-bottom:24px;"></div>
+
+        <!-- Verification status indicator -->
+        <div id="verifyStatusBox" style="background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:18px 20px;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+            <svg id="verifySpinner" style="width:18px;height:18px;stroke:#64748b;fill:none;stroke-width:2;animation:spin 1s linear infinite;" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <span id="verifyStatusTxt" style="font-size:13px;font-weight:600;color:#64748b;" id="t_verifyWaiting">Waiting for you to click the link in your email…</span>
+          </div>
+        </div>
+
+        <div id="msgVerify"></div>
+
+        <button class="btn-ghost" id="btnResend" onclick="resendVerification()" style="margin-bottom:10px;width:100%;">
+          <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>
+          <span id="t_resend">Resend email</span>
+        </button>
+        <p style="font-size:11px;color:#475569;margin-top:8px;" id="t_spamHint">Don't see it? Check your spam / junk folder.</p>
+      </div>
+
       <!-- STEP 2 -->
       <div id="step2" style="display:none;">
         <div class="f-title" id="t_payTitle">Complete payment</div>
@@ -585,6 +613,16 @@ const I18N = {
     sucPlan:(lbl)=>`Your <strong style="color:var(--green);font-weight:700;">${lbl}</strong> account is ready! Verify your email before signing in.`,
     planNames:{free:"Free",pro:"Pro",premium:"Premium"},
     period:"/month", tryAgain:"Try again",
+    verifyTitle:"Check your inbox!",
+    verifySentTo:"We sent a verification link to",
+    verifyClickLink:"Click it to continue.",
+    verifyWaiting:"Waiting for you to verify your email…",
+    verifyDone:"✅ Email verified! Continuing…",
+    resend:"Resend email",
+    resentOk:"Email resent! Check your inbox.",
+    resentFail:"Could not resend. Try again shortly.",
+    spamHint:"Don't see it? Check your spam / junk folder.",
+    verifyStep:"Verify", verifyCheckEmail:"Check email",
   },
   pt: {
     already:"Já tem uma conta?", signin:"Entrar",
@@ -633,6 +671,16 @@ const I18N = {
     sucPlan:(lbl)=>`Sua conta <strong style="color:var(--green);font-weight:700;">${lbl}</strong> está pronta! Verifique seu e-mail antes de entrar.`,
     planNames:{free:"Grátis",pro:"Pro",premium:"Premium"},
     period:"/mês", tryAgain:"Tentar novamente",
+    verifyTitle:"Verifique seu e-mail!",
+    verifySentTo:"Enviamos um link de verificação para",
+    verifyClickLink:"Clique nele para continuar.",
+    verifyWaiting:"Aguardando você verificar seu e-mail…",
+    verifyDone:"✅ E-mail verificado! Continuando…",
+    resend:"Reenviar e-mail",
+    resentOk:"E-mail reenviado! Verifique sua caixa de entrada.",
+    resentFail:"Não foi possível reenviar. Tente novamente em breve.",
+    spamHint:"Não encontrou? Verifique sua pasta de spam.",
+    verifyStep:"Verificar", verifyCheckEmail:"Checar e-mail",
   },
   es: {
     already:"¿Ya tienes una cuenta?", signin:"Iniciar sesión",
@@ -681,6 +729,16 @@ const I18N = {
     sucPlan:(lbl)=>`Tu cuenta <strong style="color:var(--green);font-weight:700;">${lbl}</strong> está lista. Verifica tu correo antes de iniciar sesión.`,
     planNames:{free:"Gratis",pro:"Pro",premium:"Premium"},
     period:"/mes", tryAgain:"Intentar de nuevo",
+    verifyTitle:"¡Revisa tu correo!",
+    verifySentTo:"Enviamos un enlace de verificación a",
+    verifyClickLink:"Haz clic en él para continuar.",
+    verifyWaiting:"Esperando que verifiques tu correo…",
+    verifyDone:"✅ ¡Correo verificado! Continuando…",
+    resend:"Reenviar correo",
+    resentOk:"¡Correo reenviado! Revisa tu bandeja.",
+    resentFail:"No se pudo reenviar. Inténtalo de nuevo.",
+    spamHint:"¿No lo ves? Revisa tu carpeta de spam.",
+    verifyStep:"Verificar", verifyCheckEmail:"Revisar correo",
   }
 };
 
@@ -805,6 +863,7 @@ function showMsg(id,html,type){
 }
 
 let createdUser=null;
+let verifyPollTimer=null;
 ["iName","iEmail","iPw","iPw2"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")doRegister();}));
 
 async function doRegister(){
@@ -818,7 +877,7 @@ async function doRegister(){
   const b=document.getElementById("btn1");
   b.disabled=true;b.innerHTML=`<svg style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2;animation:spin 0.8s linear infinite;" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span>${T.creating}</span>`;
   await new Promise(r=>{if(window._fb)return r();window.addEventListener("fbReady",r,{once:true});});
-  const {db,auth,createUserWithEmailAndPassword,updateProfile,sendEmailVerification,doc,setDoc}=window._fb;
+  const {db,auth,createUserWithEmailAndPassword,updateProfile,sendEmailVerification,signOut,doc,setDoc}=window._fb;
   try{
     const base=name.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)||"trader";
     const uname=`${base}_${Math.random().toString(36).slice(2,6)}`;
@@ -826,28 +885,106 @@ async function doRegister(){
     await updateProfile(cred.user,{displayName:name});
     try{await setDoc(doc(db,"usernames",uname),{username:uname,email,uid:cred.user.uid,createdAt:Date.now()});}catch(e){}
     try{await setDoc(doc(db,`users/${cred.user.uid}/settings`,"profile"),{username:uname,displayName:name,plan:"free"},{merge:true});}catch(e){}
-    await sendEmailVerification(cred.user,{url:"https://bullnote.pages.dev/app.html"});
-    createdUser=cred.user;
+    await sendEmailVerification(cred.user);
+    // Sign out immediately — user can only enter after verifying
+    await signOut(auth);
+    createdUser={email,pw,uname,name,uid:cred.user.uid};
     document.getElementById("unameVal").textContent=uname;
-    const isPaid = activePlan==="pro"||activePlan==="premium";
-    if(isPaid){
-      document.getElementById("step1").style.display="none";
-      document.getElementById("step2").style.display="block";
-      document.getElementById("s1c").className="s-circle done";
-      document.getElementById("s1c").innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
-      document.getElementById("s1l").className="s-lbl done";
-      document.getElementById("s2c").className="s-circle active";
-      document.getElementById("s2l").className="s-lbl active";
-      document.getElementById("sfill").style.width="100%";
-      document.getElementById("planSwitcher").style.pointerEvents="none";
-      document.getElementById("planSwitcher").style.opacity="0.5";
-      initStripe();
-    }else{goSuccess("free");}
+    showStep15(email);
   }catch(e){
     const msgs={"auth/email-already-in-use":T.errEmailUsed,"auth/invalid-email":T.errInvalidEmail,"auth/too-many-requests":T.errTooMany};
     showMsg("msg1",msgs[e.code]||e.message,"error");
     b.disabled=false;b.innerHTML=`<span>${T.btnContinue}</span><svg viewBox="0 0 24 24" style="width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2.5;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
   }
+}
+
+function showStep15(email){
+  const T=I18N[currentLang];
+  document.getElementById("step1").style.display="none";
+  document.getElementById("step15").style.display="block";
+  // Update steps bar
+  document.getElementById("s1c").className="s-circle done";
+  document.getElementById("s1c").innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+  document.getElementById("s1l").className="s-lbl done";
+  document.getElementById("s15c").className="s-circle active";
+  document.getElementById("s15l").className="s-lbl active";
+  document.getElementById("sfill1").style.width="100%";
+  // Set subtitle
+  document.getElementById("t_verifySub").innerHTML=`${T.verifySentTo||"We sent a verification link to"} <strong style="color:#f1f5f9;">${email}</strong>.<br>${T.verifyClickLink||"Click it to continue to payment."}`;
+  // Disable plan switcher
+  document.getElementById("planSwitcher").style.pointerEvents="none";
+  document.getElementById("planSwitcher").style.opacity="0.5";
+  startVerifyPolling();
+}
+
+function startVerifyPolling(){
+  if(verifyPollTimer)clearInterval(verifyPollTimer);
+  verifyPollTimer=setInterval(async()=>{
+    try{
+      const {auth,signInWithEmailAndPassword,signOut}=window._fb;
+      const cred=await signInWithEmailAndPassword(auth,createdUser.email,createdUser.pw);
+      await cred.user.reload();
+      if(cred.user.emailVerified){
+        clearInterval(verifyPollTimer);
+        await signOut(auth);
+        onEmailVerified();
+      } else {
+        await signOut(auth);
+      }
+    }catch(e){}
+  },4000);
+}
+
+async function resendVerification(){
+  const T=I18N[currentLang];
+  const btn=document.getElementById("btnResend");
+  btn.disabled=true;
+  try{
+    const {auth,signInWithEmailAndPassword,sendEmailVerification,signOut}=window._fb;
+    const cred=await signInWithEmailAndPassword(auth,createdUser.email,createdUser.pw);
+    await sendEmailVerification(cred.user);
+    await signOut(auth);
+    showMsg("msgVerify",T.resentOk||"Email resent! Check your inbox.","ok");
+    setTimeout(()=>showMsg("msgVerify","",""),4000);
+  }catch(e){
+    showMsg("msgVerify",T.resentFail||"Could not resend. Try again shortly.","error");
+  }
+  setTimeout(()=>btn.disabled=false,10000);
+}
+
+function onEmailVerified(){
+  const T=I18N[currentLang];
+  clearInterval(verifyPollTimer);
+  // Update verify step indicator to done
+  document.getElementById("verifySpinner").style.display="none";
+  document.getElementById("verifyStatusBox").style.background="#22C55E12";
+  document.getElementById("verifyStatusBox").style.borderColor="#22C55E50";
+  document.getElementById("verifyStatusTxt").textContent=T.verifyDone||"✅ Email verified!";
+  document.getElementById("verifyStatusTxt").style.color="#22C55E";
+
+  const isPaid = activePlan==="pro"||activePlan==="premium";
+  if(!isPaid){
+    // Free plan — skip payment, go to success after short delay
+    setTimeout(()=>goSuccess("free"),1200);
+    return;
+  }
+  // Paid plan — show payment step after short delay
+  setTimeout(()=>{
+    document.getElementById("step15").style.display="none";
+    document.getElementById("step2").style.display="block";
+    // Update steps bar
+    document.getElementById("s15c").className="s-circle done";
+    document.getElementById("s15c").innerHTML=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+    document.getElementById("s15l").className="s-lbl done";
+    document.getElementById("sfill1").style.width="100%";
+    document.getElementById("sline2").style.display="";
+    document.getElementById("s2wrap").style.display="";
+    document.getElementById("sfill2").style.width="0%";
+    setTimeout(()=>{ document.getElementById("sfill2").style.transition="width 0.5s ease"; document.getElementById("sfill2").style.width="100%"; },50);
+    document.getElementById("s2c").className="s-circle active";
+    document.getElementById("s2l").className="s-lbl active";
+    initStripe();
+  },1200);
 }
 
 let stripe,cardEl;
@@ -878,10 +1015,13 @@ async function doPay(){
 }
 
 function goSuccess(p){
+  clearInterval(verifyPollTimer);
   document.getElementById("step1").style.display="none";
+  document.getElementById("step15").style.display="none";
   document.getElementById("step2").style.display="none";
   document.getElementById("stepsBar").style.display="none";
   document.getElementById("step3").style.display="block";
+  if(createdUser&&createdUser.uname) document.getElementById("unameVal").textContent=createdUser.uname;
   const T=I18N[currentLang];
   document.getElementById("sucMsg").innerHTML=T.sucPlan(T.planNames[p]||p);
 }
@@ -917,8 +1057,10 @@ function setLang(lang) {
   // Steps
   document.getElementById("s1l").textContent = T.step1lbl;
   document.getElementById("s2l").textContent = T.step2lbl;
+  document.getElementById("s15l").textContent = T.verifyStep||"Verify";
   document.getElementById("t_yourDetails").textContent = T.yourDetails;
   document.getElementById("t_secureCheckout").textContent = T.secureCheckout;
+  document.getElementById("t_verifyEmail2").textContent = T.verifyCheckEmail||"Check email";
 
   // Step 1
   document.getElementById("t_createTitle").textContent = T.createTitle;
@@ -977,6 +1119,13 @@ function setLang(lang) {
   document.getElementById("t_userHint").textContent = T.userHint;
   document.getElementById("t_emailVerify").innerHTML = T.emailVerify;
   document.getElementById("t_dashboard").textContent = T.dashboard;
+
+  // Verify step
+  if(document.getElementById("t_verifyTitle")) document.getElementById("t_verifyTitle").textContent = T.verifyTitle||"Check your inbox!";
+  if(document.getElementById("t_resend")) document.getElementById("t_resend").textContent = T.resend||"Resend email";
+  if(document.getElementById("t_spamHint")) document.getElementById("t_spamHint").textContent = T.spamHint||"Don't see it? Check your spam folder.";
+  if(document.getElementById("verifyStatusTxt") && document.getElementById("verifyStatusTxt").dataset.state!=="done")
+    document.getElementById("verifyStatusTxt").textContent = T.verifyWaiting||"Waiting for you to verify your email…";
 
   // Update price period label
   document.getElementById("pricePeriod").textContent = T.period;
