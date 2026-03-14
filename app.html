@@ -2802,7 +2802,7 @@ function App(){
         .analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
         .analysis-grid>*{min-width:0;overflow:hidden}
         .stat-summary-grid{grid-template-columns:repeat(5,1fr)}
-        .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+        .metric-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:8px}
         .dashboard-charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:10px}
         .gamma-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
         .metric-card{transition:all 0.2s}
@@ -2907,10 +2907,10 @@ function App(){
           .content-pad{padding:8px 10px!important}
           .filter-bar{padding:7px 8px!important;gap:4px!important;margin-bottom:10px!important;border-radius:10px!important}
           .filter-bar .chip-btn{padding:4px 10px!important;font-size:12px!important;border-radius:14px!important}
-          .metric-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
+          .metric-grid{grid-template-columns:repeat(4,1fr)!important;gap:6px!important}
           .metric-card{padding:14px 12px!important;border-radius:12px!important}
           .metric-card div:nth-child(2){font-size:28px!important}
-          .dashboard-charts-grid{grid-template-columns:1fr!important}
+          .dashboard-charts-grid{grid-template-columns:1fr!important} .dash-bottom-grid{grid-template-columns:1fr 1fr!important}
           .psych-row{flex-direction:row;flex-wrap:wrap;gap:6px!important}
           .psych-card{min-width:calc(50% - 6px)!important;flex:1 1 calc(50% - 6px)!important;padding:12px 6px!important}
           .table-scroll-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100vw;border-radius:12px}
@@ -3128,120 +3128,273 @@ function App(){
         })()}
 
         {/* DASHBOARD */}
-        {tab==="dashboard" && (
-          <div className="fade-in" style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
-            <div className="metric-grid" style={{display:"grid",gap:12}}>
+        {tab==="dashboard" && (()=>{
+          const wins   = filtered.filter(t=>t.actualPnl>0);
+          const losses = filtered.filter(t=>t.actualPnl<0);
+          const longs  = filtered.filter(t=>t.direction==="Long");
+          const shorts = filtered.filter(t=>t.direction==="Short");
+          const longWR  = longs.length  ? (longs.filter(t=>t.actualPnl>0).length/longs.length*100)  : 0;
+          const shortWR = shorts.length ? (shorts.filter(t=>t.actualPnl>0).length/shorts.length*100) : 0;
+          const longPnl  = longs.reduce((s,t)=>s+(parseFloat(t.actualPnl)||0),0);
+          const shortPnl = shorts.reduce((s,t)=>s+(parseFloat(t.actualPnl)||0),0);
+          const sortedT = [...filtered].sort((a,b)=>a.date<b.date?-1:1);
+          let curStreak=0,maxStreak=0,curLose=0,maxLose=0;
+          sortedT.forEach(t=>{if(t.actualPnl>0){curStreak++;maxStreak=Math.max(maxStreak,curStreak);curLose=0;}else{curLose++;maxLose=Math.max(maxLose,curLose);curStreak=0;}});
+          const expectancy = wins.length&&losses.length ? ((metrics.winRate/100)*metrics.avgWin - ((100-metrics.winRate)/100)*metrics.avgLoss) : 0;
+          const recent5 = sortedT.slice(-5).map(t=>({pnl:parseFloat(t.actualPnl)||0}));
+          const stratMap={};
+          filtered.forEach(t=>{if(!t.strategy)return;if(!stratMap[t.strategy])stratMap[t.strategy]={w:0,l:0,pnl:0};if(t.actualPnl>0)stratMap[t.strategy].w++;else stratMap[t.strategy].l++;stratMap[t.strategy].pnl+=(parseFloat(t.actualPnl)||0);});
+          const stratRows=Object.entries(stratMap).map(([s,v])=>({s,wr:v.w+v.l>0?v.w/(v.w+v.l)*100:0,pnl:v.pnl,n:v.w+v.l})).sort((a,b)=>b.pnl-a.pnl).slice(0,5);
+          const bestTrade  = filtered.length ? filtered.reduce((a,b)=>(parseFloat(a.actualPnl)||0)>(parseFloat(b.actualPnl)||0)?a:b) : null;
+          const worstTrade = filtered.length ? filtered.reduce((a,b)=>(parseFloat(a.actualPnl)||0)<(parseFloat(b.actualPnl)||0)?a:b) : null;
+          const ds=metrics.disciplineScore;
+          const dsColor=ds>=80?C.green:ds>=60?C.amber:C.red;
+          const planPct=metrics.stratFollowedRate;
+          const ratedTrades=filtered.filter(t=>t.tradeRating>0);
+          const ratingPct=ratedTrades.length?(ratedTrades.reduce((s,t)=>s+(t.tradeRating||0),0)/ratedTrades.length/5)*100:null;
+          const stopRespTrades=filtered.filter(t=>t.stopRespected!==undefined&&t.stopRespected!==null&&t.stopRespected!=="");
+          const stopPct=stopRespTrades.length?stopRespTrades.filter(t=>t.stopRespected==="Yes").length/stopRespTrades.length*100:100;
+          const MF="'Montserrat',sans-serif";
+          const isDark=theme==="dark";
+
+          // Card style helper
+          const card=(extra={})=>({
+            background:isDark?`linear-gradient(145deg,${C.card} 0%,${C.panel} 100%)`:C.card,
+            border:`1px solid ${C.border}`,borderRadius:14,padding:"16px 18px",
+            position:"relative",overflow:"hidden",...extra
+          });
+          const Lbl=({c:col,children})=><div style={{fontSize:9,color:col||C.muted,fontWeight:700,letterSpacing:"0.12em",textTransform:"uppercase",fontFamily:MF,marginBottom:7}}>{children}</div>;
+          const Val=({v,col,sz=30,glow=true})=><div style={{fontSize:sz,fontWeight:900,color:col,fontFamily:MF,lineHeight:1,letterSpacing:"-0.02em",textShadow:isDark&&glow?`0 0 24px ${col}45`:"none"}}>{v}</div>;
+          const Bar=({col})=><div style={{position:"absolute",top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${col},${col}40,transparent)`}}/>;
+          const Sep=()=><div style={{height:1,background:`${C.border}60`,margin:"10px 0"}}/>;
+
+          return (
+          <div className="fade-in" style={{flex:1,display:"flex",flexDirection:"column",gap:10}}>
+
+            {/* ── ROW 1: KPI BAR ─────────────────────────────────── */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr) 0.8fr 0.8fr repeat(2,1fr)",gap:8}}>
               {[
-                {label:T.totalPnl,value:fmt(metrics.totalPnl),color:pnlColor(metrics.totalPnl),sub:`${metrics.totalTrades} trades`,icon:"◈"},
-                {label:T.winRate,value:metrics.winRate.toFixed(1)+"%",color:metrics.winRate>=50?C.green:C.red,sub:`${filtered.filter(t=>t.actualPnl>0).length}W / ${filtered.filter(t=>t.actualPnl<0).length}L`,icon:"◎"},
-                {label:T.profitFactor,value:metrics.profitFactor.toFixed(2)+"x",color:metrics.profitFactor>=1.5?C.green:metrics.profitFactor>=1?C.amber:C.red,sub:T.grossProfit,icon:"⬡"},
-                {label:T.maxDrawdown,value:"−$"+metrics.maxDrawdown.toFixed(0),color:C.red,sub:T.peakTrough,icon:"▽"},
-                {label:T.avgWin,value:fmt(metrics.avgWin),color:C.green,sub:T.perWin,icon:"△"},
-                {label:T.avgLoss,value:"−$"+metrics.avgLoss.toFixed(0),color:C.red,sub:T.perLoss,icon:"▽"},
-                {label:T.avgRating||"Avg Rating",value:metrics.avgRating>0?("★".repeat(Math.round(metrics.avgRating))+"☆".repeat(5-Math.round(metrics.avgRating))):"—",color:C.amber,sub:metrics.avgRating>0?`${metrics.avgRating.toFixed(1)}/5.0`:(T.noData||"—"),starDisplay:true,icon:"★"},
-                {label:T.bestStrategy,value:metrics.bestStrategy||"—",color:C.accent,sub:T.byTotalPnl,small:true,icon:"◆"},
-              ].map((m,idx)=>{
-                const accentColor = m.color;
-                return (
-                  <div key={m.label} className="metric-card"
-                    style={{
-                      background:theme==="dark"
-                        ?`linear-gradient(135deg, ${C.card} 0%, ${C.panel} 100%)`
-                        :`linear-gradient(135deg, ${C.card} 0%, ${C.panel} 100%)`,
-                      border:`1px solid ${C.border}`,
-                      borderTop:`1px solid ${accentColor}40`,
-                      borderRadius:16,
-                      padding:"20px 22px",
-                      flex:1,
-                      "--card-glow":`${accentColor}08`,
-                      animationDelay:`${idx*0.05}s`,
-                    }}>
-                    {/* Top row */}
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{m.label}</div>
-                      <div style={{width:28,height:28,borderRadius:8,background:`${accentColor}15`,border:`1px solid ${accentColor}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:accentColor}}>{m.icon}</div>
-                    </div>
-                    {/* Value */}
-                    {m.starDisplay
-                      ? <div style={{fontSize:22,lineHeight:1,marginBottom:8,letterSpacing:3,color:m.color}}>{m.value}</div>
-                      : <div className="metric-value" style={{fontSize:m.small?24:38,fontWeight:900,color:accentColor,lineHeight:1,marginBottom:8,fontFamily:"'Montserrat',sans-serif",letterSpacing:"-0.02em",textShadow:theme==="dark"?`0 0 20px ${accentColor}40`:"none"}}>{m.value}</div>
-                    }
-                    {/* Sub */}
-                    <div style={{fontSize:11,color:C.muted,fontFamily:"'Montserrat',sans-serif",fontWeight:500}}>{m.sub}</div>
-                    {/* Bottom accent line */}
-                    <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${accentColor}60,transparent)`,borderRadius:"0 0 16px 16px"}}/>
-                  </div>
-                );
-              })}
+                {lbl:T.totalPnl||"Total P&L",    val:fmt(metrics.totalPnl),           col:pnlColor(metrics.totalPnl), sub:`${metrics.totalTrades} trades`},
+                {lbl:T.winRate||"Win Rate",       val:metrics.winRate.toFixed(1)+"%",   col:metrics.winRate>=50?C.green:C.red, sub:`${wins.length}W · ${losses.length}L`},
+                {lbl:T.profitFactor||"Prof. Factor",val:metrics.profitFactor.toFixed(2)+"x",col:metrics.profitFactor>=1.5?C.green:metrics.profitFactor>=1?C.amber:C.red, sub:"gross ratio"},
+                {lbl:"Expectancy",                val:(expectancy>=0?"+$":"−$")+Math.abs(expectancy).toFixed(0), col:expectancy>=0?C.green:C.red, sub:"per trade"},
+                {lbl:"Best Streak",               val:maxStreak+" W",                  col:C.green, sub:"consecutive", sm:true},
+                {lbl:"Worst Streak",              val:maxLose+" L",                    col:C.red,   sub:"consecutive", sm:true},
+                {lbl:T.avgWin||"Avg Win",         val:fmt(metrics.avgWin),             col:C.green, sub:"winning trades"},
+                {lbl:T.avgLoss||"Avg Loss",       val:"−$"+metrics.avgLoss.toFixed(0), col:C.red,   sub:"losing trades"},
+              ].map((m,i)=>(
+                <div key={i} className="metric-card" style={{...card({padding:"13px 14px"}),borderTop:`2px solid ${m.col}60`}}>
+                  <Bar col={m.col}/>
+                  <div style={{fontSize:9,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF,marginBottom:7,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.lbl}</div>
+                  <div style={{fontSize:m.sm?16:24,fontWeight:900,color:m.col,fontFamily:MF,lineHeight:1,letterSpacing:"-0.02em",textShadow:isDark?`0 0 18px ${m.col}40`:"none",marginBottom:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.val}</div>
+                  <div style={{fontSize:9,color:C.muted,fontFamily:MF}}>{m.sub}</div>
+                  <div style={{position:"absolute",bottom:0,left:0,right:0,height:1,background:`linear-gradient(90deg,${m.col}40,transparent)`}}/>
+                </div>
+              ))}
             </div>
 
-            {/* DISCIPLINE SCORE WIDGET */}
-            {(()=>{
-              const ds=metrics.disciplineScore;
-              const dsColor=ds>=80?C.green:ds>=60?C.amber:C.red;
-              const planPct=metrics.stratFollowedRate;
-              const ratedTrades=filtered.filter(t=>t.tradeRating>0);
-              const ratingPct=ratedTrades.length?(ratedTrades.reduce((s,t)=>s+(t.tradeRating||0),0)/ratedTrades.length/5)*100:null;
-              const stopRespTrades=filtered.filter(t=>t.stopRespected!==undefined&&t.stopRespected!==null&&t.stopRespected!=="");
-              const stopPct=stopRespTrades.length ? stopRespTrades.filter(t=>t.stopRespected==="Yes").length/stopRespTrades.length*100 : (()=>{const lossArr=filtered.filter(t=>t.actualPnl<0);if(lossArr.length===0)return 100;const bad=lossArr.filter(t=>{const stop=parseFloat(t.stopPrice)||0,entry=parseFloat(t.entryPrice)||0,contracts=parseFloat(t.contracts)||1;const maxL=stop>0&&entry>0?Math.abs(stop-entry)*contracts*50:0;return maxL>0&&Math.abs(t.actualPnl)>maxL*1.15;});return Math.max(0,100-(bad.length/lossArr.length)*100);})();
-              const pillars=[
-                {label:T.discPlan||"Plano Seguido",pct:planPct,color:planPct>=80?C.green:planPct>=60?C.amber:C.red},
-                {label:T.discStop||"Stop Respeitado",pct:stopPct,color:stopPct>=80?C.green:stopPct>=60?C.amber:C.red},
-                {label:T.discRating||"Avaliação",pct:ratingPct,color:ratingPct!=null?(ratingPct>=70?C.green:ratingPct>=50?C.amber:C.red):C.muted,noData:ratingPct==null},
-              ];
-              return (
-                <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`linear-gradient(135deg,${C.card},${C.panel})`,border:`1px solid ${dsColor}30`,borderRadius:16,padding:"22px 26px",position:"relative",overflow:"hidden"}}>
-                  {/* Background glow */}
-                  {theme==="dark"&&<div style={{position:"absolute",top:-40,right:-40,width:160,height:160,borderRadius:"50%",background:`${dsColor}08`,filter:"blur(40px)",pointerEvents:"none"}}/>}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,position:"relative"}}>
-                    <div>
-                      <div style={{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif",marginBottom:6}}>⬡ {T.disciplineScore||"Discipline Score"}</div>
-                      <div style={{fontSize:13,color:C.muted,fontFamily:"'Montserrat',sans-serif"}}>{T.discPlan||"Plan"} · {T.discStop||"Stop"} · {T.discRating||"Rating"}</div>
+            {/* ── ROW 2: MAIN CONTENT ────────────────────────────── */}
+            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+
+              {/* LEFT: Equity Curve + P&L by Day stacked */}
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+                {/* EQUITY CURVE */}
+                <div style={{...card({padding:"18px 20px"})}}>
+                  <Bar col={C.cyan}/>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{width:3,height:18,background:`linear-gradient(180deg,${C.cyan},${C.green})`,borderRadius:2}}/>
+                      <div>
+                        <div style={{fontSize:10,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF}}>{T.equityCurve||"Equity Curve"}</div>
+                        <div style={{fontSize:10,color:C.muted,fontFamily:MF,marginTop:2}}>{filtered.length} trades · {filtered.length>0?sortedT[0]?.date+" → "+sortedT[sortedT.length-1]?.date:""}</div>
+                      </div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:56,fontWeight:900,color:dsColor,fontFamily:"'Montserrat',sans-serif",lineHeight:1,textShadow:theme==="dark"?`0 0 30px ${dsColor}50`:"none"}}>
-                        {ds}<span style={{fontSize:20,opacity:0.5,fontWeight:600}}>/100</span>
-                      </div>
-                      <div style={{fontSize:11,fontWeight:700,color:dsColor,marginTop:4,letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{ds>=80?"🏆 Excellent":ds>=60?"👍 Good":"⚠️ Improve"}</div>
+                      <div style={{fontSize:28,fontWeight:900,color:pnlColor(metrics.totalPnl),fontFamily:MF,lineHeight:1,textShadow:isDark?`0 0 24px ${pnlColor(metrics.totalPnl)}45`:"none"}}>{fmt(metrics.totalPnl)}</div>
+                      <div style={{fontSize:9,color:C.muted,fontFamily:MF,marginTop:2}}>total P&L</div>
                     </div>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,position:"relative"}}>
-                    {pillars.map(p=>(
-                      <div key={p.label}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                          <span style={{fontSize:11,color:C.muted,fontWeight:600,fontFamily:"'Montserrat',sans-serif",letterSpacing:"0.04em"}}>{p.label}</span>
-                          <span style={{fontSize:12,fontWeight:800,color:p.noData?C.muted:p.color,fontFamily:"'Montserrat',sans-serif"}}>{p.noData?"—":p.pct.toFixed(0)+"%"}</span>
+                  <SimpleLineChart data={equityCurve} height={180} T={T}/>
+                </div>
+
+                {/* P&L BY DAY */}
+                <div style={{...card({padding:"16px 20px"})}}>
+                  <Bar col={C.amber}/>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <div style={{width:3,height:16,background:`linear-gradient(180deg,${C.amber},${C.red})`,borderRadius:2}}/>
+                      <span style={{fontSize:10,fontWeight:700,color:C.text,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF}}>{T.pnlByDay||"P&L by Day"}</span>
+                    </div>
+                    <div style={{display:"flex",gap:14}}>
+                      {[
+                        {lbl:"Profitable Days",val:pnlByDay.filter(d=>d.pnl>0).length,col:C.green},
+                        {lbl:"Loss Days",val:pnlByDay.filter(d=>d.pnl<0).length,col:C.red},
+                      ].map(s=>(
+                        <div key={s.lbl} style={{textAlign:"right"}}>
+                          <div style={{fontSize:16,fontWeight:900,color:s.col,fontFamily:MF,lineHeight:1}}>{s.val}</div>
+                          <div style={{fontSize:9,color:C.muted,fontFamily:MF}}>{s.lbl}</div>
                         </div>
-                        <div style={{height:6,background:C.border,borderRadius:3,overflow:"hidden"}}>
-                          <div className="progress-bar" style={{height:"100%",width:(p.noData?0:p.pct)+"%",background:p.noData?C.border:`linear-gradient(90deg,${p.color},${p.color}aa)`,borderRadius:3,boxShadow:p.noData?"none":`0 0 8px ${p.color}60`}}/>
+                      ))}
+                    </div>
+                  </div>
+                  <SimpleBarChart data={pnlByDay} height={150} T={T}/>
+                </div>
+              </div>
+
+              {/* RIGHT COLUMN: stacked widgets */}
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+                {/* DISCIPLINE SCORE */}
+                <div style={{...card({border:`1px solid ${dsColor}25`,padding:"16px 18px"})}}>
+                  <Bar col={dsColor}/>
+                  {isDark&&<div style={{position:"absolute",top:-40,right:-40,width:140,height:140,borderRadius:"50%",background:`${dsColor}08`,filter:"blur(35px)",pointerEvents:"none"}}/>}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+                    <div>
+                      <Lbl>{T.disciplineScore||"Discipline"}</Lbl>
+                      <div style={{fontSize:9,color:C.muted,fontFamily:MF}}>Plan · Stop · Rating</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:52,fontWeight:900,color:dsColor,fontFamily:MF,lineHeight:1,textShadow:isDark?`0 0 32px ${dsColor}55`:"none"}}>{ds}</div>
+                      <div style={{fontSize:9,color:dsColor,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:MF}}>/100 · {ds>=80?"Excellent":ds>=60?"Good":"Improve"}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:9}}>
+                    {[
+                      {lbl:T.discPlan||"Plan Followed",pct:planPct,col:planPct>=80?C.green:planPct>=60?C.amber:C.red},
+                      {lbl:T.discStop||"Stop Respected",pct:stopPct,col:stopPct>=80?C.green:stopPct>=60?C.amber:C.red},
+                      {lbl:"Rating Score",pct:ratingPct,col:ratingPct!=null?(ratingPct>=70?C.green:ratingPct>=50?C.amber:C.red):C.muted,nd:ratingPct==null},
+                    ].map(p=>(
+                      <div key={p.lbl}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                          <span style={{fontSize:9,color:C.muted,fontWeight:600,fontFamily:MF}}>{p.lbl}</span>
+                          <span style={{fontSize:10,fontWeight:800,color:p.nd?C.muted:p.col,fontFamily:MF}}>{p.nd?"—":p.pct.toFixed(0)+"%"}</span>
+                        </div>
+                        <div style={{height:4,background:`${C.border}80`,borderRadius:2,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:(p.nd?0:p.pct)+"%",background:`linear-gradient(90deg,${p.col},${p.col}80)`,borderRadius:2,boxShadow:p.nd?"none":`0 0 8px ${p.col}50`,transition:"width 1s cubic-bezier(0.16,1,0.3,1)"}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Sep/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                    {[
+                      {lbl:"Best Streak",val:maxStreak+"W",col:C.green},
+                      {lbl:"Worst",val:maxLose+"L",col:C.red},
+                      {lbl:"Avg Rating",val:metrics.avgRating>0?metrics.avgRating.toFixed(1)+"★":"—",col:C.amber},
+                    ].map(s=>(
+                      <div key={s.lbl} style={{textAlign:"center",background:`${s.col}08`,borderRadius:8,padding:"8px 4px",border:`1px solid ${s.col}20`}}>
+                        <div style={{fontSize:16,fontWeight:900,color:s.col,fontFamily:MF}}>{s.val}</div>
+                        <div style={{fontSize:8,color:C.muted,fontFamily:MF,marginTop:2,letterSpacing:"0.06em",textTransform:"uppercase"}}>{s.lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* LONG vs SHORT */}
+                <div style={{...card({padding:"14px 16px"})}}>
+                  <Bar col={C.blue}/>
+                  <Lbl>Long vs Short</Lbl>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {[
+                      {dir:"LONG",wr:longWR,pnl:longPnl,n:longs.length,col:C.green},
+                      {dir:"SHORT",wr:shortWR,pnl:shortPnl,n:shorts.length,col:C.red},
+                    ].map(d=>(
+                      <div key={d.dir} style={{background:`${d.col}08`,border:`1px solid ${d.col}18`,borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                          <span style={{fontSize:9,fontWeight:800,color:d.col,fontFamily:MF,letterSpacing:"0.1em"}}>{d.dir}</span>
+                          <span style={{fontSize:9,color:C.muted,fontFamily:MF}}>{d.n} trades</span>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+                          <div style={{fontSize:22,fontWeight:900,color:d.col,fontFamily:MF}}>{d.wr.toFixed(1)}<span style={{fontSize:10,fontWeight:600}}>%</span></div>
+                          <div style={{fontSize:12,fontWeight:800,color:d.pnl>=0?C.green:C.red,fontFamily:MF}}>{d.pnl>=0?"+$":"−$"}{Math.abs(d.pnl).toFixed(0)}</div>
+                        </div>
+                        <div style={{height:3,background:`${C.border}80`,borderRadius:2,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:d.wr+"%",background:`linear-gradient(90deg,${d.col},${d.col}80)`,borderRadius:2,boxShadow:`0 0 6px ${d.col}40`}}/>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              );
-            })()}
 
-            <div className="dashboard-charts-grid" style={{display:"grid",gap:12,flex:1}}>
-              <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`${C.card}`,border:`1px solid ${C.border}`,borderTop:`1px solid ${C.cyan}30`,borderRadius:16,padding:"20px 22px",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-                  <div style={{width:3,height:18,background:`linear-gradient(180deg,${C.cyan},${C.green})`,borderRadius:2}}/>
-                  <span style={{fontSize:12,fontWeight:700,color:C.text,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{T.equityCurve}</span>
+                {/* BEST / WORST + EXPECTANCY */}
+                <div style={{...card({padding:"14px 16px"})}}>
+                  <Bar col={C.purple}/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                    {[
+                      {lbl:"Best Trade",t:bestTrade,col:C.green,icon:"▲"},
+                      {lbl:"Worst Trade",t:worstTrade,col:C.red,icon:"▼"},
+                    ].map(({lbl,t,col,icon})=>(
+                      <div key={lbl} style={{background:`${col}08`,border:`1px solid ${col}18`,borderRadius:10,padding:"10px 10px"}}>
+                        <div style={{fontSize:8,color:col,fontWeight:800,fontFamily:MF,letterSpacing:"0.1em",marginBottom:4}}>{icon} {lbl.toUpperCase()}</div>
+                        {t ? (<>
+                          <div style={{fontSize:18,fontWeight:900,color:col,fontFamily:MF,lineHeight:1}}>{t.actualPnl>=0?"+$":"−$"}{Math.abs(parseFloat(t.actualPnl)||0).toFixed(0)}</div>
+                          <div style={{fontSize:9,color:C.muted,fontFamily:MF,marginTop:4}}>{t.symbol||"—"} · {t.date||""}</div>
+                        </>) : <div style={{fontSize:11,color:C.muted,fontFamily:MF}}>—</div>}
+                      </div>
+                    ))}
+                  </div>
+                  <Sep/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    <div>
+                      <Lbl>Expectancy</Lbl>
+                      <Val v={(expectancy>=0?"+$":"−$")+Math.abs(expectancy).toFixed(0)} col={expectancy>=0?C.green:C.red} sz={20}/>
+                      <div style={{fontSize:9,color:C.muted,fontFamily:MF,marginTop:3}}>avg / trade</div>
+                    </div>
+                    <div>
+                      <Lbl>Last 5 Trades</Lbl>
+                      <div style={{display:"flex",gap:3,alignItems:"flex-end",height:28}}>
+                        {(recent5.length?recent5:[{pnl:0},{pnl:0},{pnl:0},{pnl:0},{pnl:0}]).map((t,i)=>{
+                          const maxAbs=Math.max(...(recent5.length?recent5:[{pnl:1}]).map(x=>Math.abs(x.pnl)),1);
+                          const h=Math.max(3,Math.abs(t.pnl)/maxAbs*26);
+                          return <div key={i} style={{flex:1,height:h+"px",background:t.pnl>=0?C.green:C.red,borderRadius:2,opacity:0.85,boxShadow:`0 0 4px ${t.pnl>=0?C.green:C.red}40`}}/>;
+                        })}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{flex:1,minHeight:160}}><SimpleLineChart data={equityCurve} height={200} T={T}/></div>
-              </div>
-              <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`${C.card}`,border:`1px solid ${C.border}`,borderTop:`1px solid ${C.amber}30`,borderRadius:16,padding:"20px 22px"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-                  <div style={{width:3,height:18,background:`linear-gradient(180deg,${C.amber},${C.red})`,borderRadius:2}}/>
-                  <span style={{fontSize:12,fontWeight:700,color:C.text,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{T.pnlByDay}</span>
-                </div>
-                <SimpleBarChart data={pnlByDay} height={180} T={T}/>
               </div>
             </div>
+
+            {/* ── ROW 3: STRATEGY BREAKDOWN ──────────────────────── */}
+            <div style={{...card({padding:"16px 20px"})}}>
+              <Bar col={C.accent}/>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:3,height:16,background:`linear-gradient(180deg,${C.accent},${C.cyan})`,borderRadius:2}}/>
+                  <span style={{fontSize:10,fontWeight:700,color:C.text,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF}}>Strategy Breakdown</span>
+                </div>
+                <span style={{fontSize:9,color:C.muted,fontFamily:MF}}>{stratRows.length} strategies · top by P&L</span>
+              </div>
+              {stratRows.length===0
+                ? <div style={{fontSize:12,color:C.muted,fontFamily:MF,padding:"20px 0",textAlign:"center"}}>No strategy data yet</div>
+                : <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(stratRows.length,5)},1fr)`,gap:10}}>
+                  {stratRows.map((r,i)=>{
+                    const maxPnl=Math.max(...stratRows.map(x=>Math.abs(x.pnl)),1);
+                    const pct=Math.abs(r.pnl)/maxPnl*100;
+                    const col=r.pnl>=0?C.green:C.red;
+                    return (
+                      <div key={r.s} style={{background:`${col}06`,border:`1px solid ${col}18`,borderRadius:12,padding:"12px 14px",position:"relative",overflow:"hidden"}}>
+                        <div style={{position:"absolute",bottom:0,left:0,height:3,width:pct+"%",background:`linear-gradient(90deg,${col},${col}60)`,borderRadius:"0 2px 0 12px"}}/>
+                        <div style={{fontSize:8,color:C.muted,fontFamily:MF,marginBottom:6,letterSpacing:"0.05em"}}>#{i+1}</div>
+                        <div style={{fontSize:12,fontWeight:800,color:C.text,fontFamily:MF,marginBottom:8,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.s}</div>
+                        <div style={{fontSize:22,fontWeight:900,color:col,fontFamily:MF,lineHeight:1,textShadow:isDark?`0 0 16px ${col}40`:"none",marginBottom:4}}>{r.pnl>=0?"+$":"−$"}{Math.abs(r.pnl).toFixed(0)}</div>
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
+                          <span style={{fontSize:9,color:C.muted,fontFamily:MF}}>{r.n} trades</span>
+                          <span style={{fontSize:10,fontWeight:800,color:r.wr>=50?C.green:C.red,fontFamily:MF}}>{r.wr.toFixed(0)}% WR</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              }
+            </div>
+
+            {/* AI Psychology */}
             <PsychologyAI trades={filtered} C={C} lang={lang}/>
           </div>
-        )}
-
+          );
+        })()}
         {/* TRADES */}
         {tab==="trades" && (
           <div style={{flex:1,display:'flex',flexDirection:'column'}} className="fade-in table-scroll-wrap" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,overflow:"auto",flex:1}}>
