@@ -2244,10 +2244,10 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                           const discountStr = couponStatus.discount;
                           if(discountStr.includes("%")){
                             const pct = parseFloat(discountStr);
-                            discountedVal = basePrice * (1 - pct/100);
+                            discountedVal = Math.floor(basePrice * (1 - pct/100) * 100) / 100;
                           } else if(discountStr.includes("$")){
                             const amt = parseFloat(discountStr.replace(/[^0-9.]/g,""));
-                            discountedVal = Math.max(0, basePrice - amt);
+                            discountedVal = Math.max(0, Math.floor((basePrice - amt) * 100) / 100);
                           }
                           if(discountedVal !== null){
                             originalPrice = `$${basePrice.toFixed(2)}`;
