@@ -1460,7 +1460,7 @@ function PsychologyAI({trades, C, lang}){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{width:40,height:40,borderRadius:10,background:"linear-gradient(135deg,#22C55E,#a855f7)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🧠</div>
           <div>
-            <div style={{fontSize:22,fontWeight:800,color:C.text}}>{L.title}</div>
+            <div style={{fontSize:22,fontWeight:800,color:C.text}}>{T.acTitle}</div>
             {analysis&&<div style={{fontSize:13,color:C.muted}}>{analysis.count} {L.tradesUsed} · {analysis.date}</div>}
           </div>
         </div>
@@ -1497,40 +1497,8 @@ function PsychologyAI({trades, C, lang}){
   );
 }
 
-function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername}){
-  const labels = {
-    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança", planTab:"Plano",
-      name:"Nome de exibição", email:"Email", newEmail:"Novo email",
-      emailInfo:"Um link de confirmação será enviado para o novo email.",
-      emailSent:"✅ Link de confirmação enviado! Verifique sua caixa de entrada.",
-      changePwd:"Alterar senha", currentPwd:"Senha atual", newPwd:"Nova senha", confirmPwd:"Confirmar nova senha",
-      save:"Salvar alterações", saveEmail:"Enviar confirmação", logout:"Sair da conta",
-      success:"Alterações salvas!", reauthMsg:"Por segurança, confirme sua senha atual antes de continuar.",
-      pwdMismatch:"As senhas não coincidem.", pwdShort:"Mínimo 6 caracteres.",
-      photoLabel:"Foto de perfil", changePhoto:"Alterar foto", uploading:"Enviando...",
-      close:"Fechar" },
-    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad", planTab:"Plan",
-      name:"Nombre visible", email:"Email actual", newEmail:"Nuevo email",
-      emailInfo:"Se enviará un enlace de confirmación al nuevo email.",
-      emailSent:"✅ ¡Enlace enviado! Revisa tu bandeja de entrada.",
-      changePwd:"Cambiar contraseña", currentPwd:"Contraseña actual", newPwd:"Nueva contraseña", confirmPwd:"Confirmar contraseña",
-      save:"Guardar cambios", saveEmail:"Enviar confirmación", logout:"Cerrar sesión",
-      success:"¡Cambios guardados!", reauthMsg:"Por seguridad, confirma tu contraseña actual antes de continuar.",
-      pwdMismatch:"Las contraseñas no coinciden.", pwdShort:"Mínimo 6 caracteres.",
-      photoLabel:"Foto de perfil", changePhoto:"Cambiar foto", uploading:"Subiendo...",
-      close:"Cerrar" },
-    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security", planTab:"Plan",
-      name:"Display name", email:"Current email", newEmail:"New email",
-      emailInfo:"A confirmation link will be sent to the new email.",
-      emailSent:"✅ Confirmation link sent! Check your inbox.",
-      changePwd:"Change password", currentPwd:"Current password", newPwd:"New password", confirmPwd:"Confirm new password",
-      save:"Save changes", saveEmail:"Send confirmation", logout:"Sign out",
-      success:"Changes saved!", reauthMsg:"For security, confirm your current password before continuing.",
-      pwdMismatch:"Passwords do not match.", pwdShort:"Minimum 6 characters.",
-      photoLabel:"Profile photo", changePhoto:"Change photo", uploading:"Uploading...",
-      close:"Close" },
-  };
-  const L = labels[lang]||labels.en;
+function AccountModal({C, currentUser, onClose, onLogout, lang, T, userPhotoURL, onPhotoChange, userUsername}){
+
 
   const [tab, setTab]             = React.useState("profile");
   const [displayName, setDisplayName] = React.useState(currentUser?.displayName||"");
@@ -1632,7 +1600,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     card.mount("#stripe-card-mount");
     card.on("change", e=>{
       setCardComplete(e.complete);
-      if(e.error) setPlanMsg({type:"error",text:e.error.message});
+      if(e.error) setPlanMsg({type:"error",text:e.error.message||T.acPlanError});
       else setPlanMsg(null);
     });
   }
@@ -1668,9 +1636,9 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       setCardComplete(false);
       setCouponCode("");
       setCouponStatus(null);
-      setPlanMsg({type:"success", text:"✅ Plano ativado com sucesso!"});
+      setPlanMsg({type:"success", text:T.acPlanUpdated});
     }catch(e){
-      setPlanMsg({type:"error", text: e.message});
+      setPlanMsg({type:"error", text: T.acCardDeclined});
     }
     setPayLoading(false);
   }
@@ -1738,7 +1706,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       if(!res.ok || data.error) throw new Error(data.error||"Cupom inválido.");
       setCouponStatus({valid:true, label: data.label, discount: data.discount, promoId: data.promoId});
     }catch(e){
-      setCouponStatus({valid:false, label: e.message});
+      setCouponStatus({valid:false, label: T.acPlanError});
     }
     setCouponLoading(false);
   }
@@ -1747,7 +1715,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     if(!file) return;
     const validTypes = ["image/jpeg","image/png","image/webp","image/gif"];
     if(!validTypes.includes(file.type)){ setMsg({type:"error",text:"Use JPG, PNG, WEBP ou GIF."}); return; }
-    if(file.size > 5*1024*1024){ setMsg({type:"error",text:"Imagem muito grande. Máximo 5MB."}); return; }
+    if(file.size > 5*1024*1024){ setMsg({type:"error",text:L.photoSizeError}); return; }
     setPhotoUploading(true); setMsg(null);
     try{
       const dataUrl = await new Promise((res,rej)=>{
@@ -1777,10 +1745,10 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       );
       setPhotoURL(dataUrl);
       onPhotoChange(dataUrl);
-      setMsg({type:"success", text:L.success});
+      setMsg({type:"success", text:T.acEmailSent});
     }catch(e){
       console.error("Photo error:", e);
-      setMsg({type:"error", text:"Erro: " + (e?.message || "tente novamente.")});
+      setMsg({type:"error", text:L.photoError});
     }
     setPhotoUploading(false);
   }
@@ -1795,7 +1763,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
         { displayName: displayName.trim()||null },
         { merge: true }
       );
-      setMsg({type:"success", text:L.success});
+      setMsg({type:"success", text:T.acSuccess});
     }catch(e){ setMsg({type:"error", text:e.message}); }
     setLoading(false);
   }
@@ -1806,10 +1774,10 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     try{
       await reauth(currentPwd);
       await window.fbVerifyBeforeUpdateEmail(currentUser, newEmail.trim());
-      setMsg({type:"success", text:L.emailSent});
+      setMsg({type:"success", text:T.acEmailSent});
       setNewEmail(""); setCurrentPwd("");
     }catch(e){
-      const msgs={"auth/wrong-password":"Senha atual incorreta.","auth/invalid-credential":"Senha atual incorreta.","auth/invalid-email":"Email inválido."};
+      const msgs={"auth/wrong-password":T.acEmailWrongPwd,"auth/invalid-credential":T.acEmailWrongPwd,"auth/invalid-email":T.acEmailInvalid};
       setMsg({type:"error", text:msgs[e.code]||e.message});
     }
     setLoading(false);
@@ -1817,16 +1785,16 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
   async function savePassword(){
     setMsg(null);
-    if(newPwd!==confirmPwd){ setMsg({type:"error",text:L.pwdMismatch}); return; }
-    if(newPwd.length<6){ setMsg({type:"error",text:L.pwdShort}); return; }
+    if(newPwd!==confirmPwd){ setMsg({type:"error",text:T.acPwdMismatch}); return; }
+    if(newPwd.length<6){ setMsg({type:"error",text:T.acPwdShort}); return; }
     setLoading(true);
     try{
       await reauth(currentPwd);
       await window.fbUpdatePassword(currentUser, newPwd);
       setCurrentPwd(""); setNewPwd(""); setConfirmPwd("");
-      setMsg({type:"success", text:L.success});
+      setMsg({type:"success", text:T.acEmailSent});
     }catch(e){
-      const msgs={"auth/wrong-password":"Senha atual incorreta.","auth/invalid-credential":"Senha atual incorreta."};
+      const msgs={"auth/wrong-password":L.pwdWrongCurrent,"auth/invalid-credential":L.pwdWrongCurrent};
       setMsg({type:"error", text:msgs[e.code]||e.message});
     }
     setLoading(false);
@@ -1854,7 +1822,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       badge:null
     },
     {
-      id:"pro", label:"Pro", price:"$16.99", period:"/mês",
+      id:"pro", label:"Pro", price:"$16.99", period:T.acPerMonth,
       color:"#22C55E", gradient:"linear-gradient(135deg,#22C55E,#3b82f6)",
       features:[
         "Trade Journal — trades ilimitados",
@@ -1866,10 +1834,10 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
         "Multi-idioma (EN/PT/ES)",
       ],
       locked:[],
-      badge:"POPULAR"
+      badge:T.acPopular
     },
     {
-      id:"premium", label:"Premium", price:"$24.99", period:"/mês",
+      id:"premium", label:"Premium", price:"$24.99", period:T.acPerMonth,
       color:"#a855f7", gradient:"linear-gradient(135deg,#a855f7,#ec4899)",
       features:[
         "Trade Journal — trades ilimitados",
@@ -1883,7 +1851,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
         "Suporte Prioritário",
       ],
       locked:[],
-      badge:"BEST VALUE"
+      badge:T.acBestValue
     }
   ];
 
@@ -1910,14 +1878,14 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             </div>
             <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>uploadPhoto(e.target.files?.[0])}/>
             <div>
-              <div style={{fontSize:22,fontWeight:800,color:C.text,fontFamily:MF,letterSpacing:"-0.02em"}}>{L.title}</div>
+              <div style={{fontSize:22,fontWeight:800,color:C.text,fontFamily:MF,letterSpacing:"-0.02em"}}>{T.acTitle}</div>
               <div style={{fontSize:13,color:C.muted,marginTop:2,fontFamily:MF}}>{currentUser?.displayName||currentUser?.email}</div>
               <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
                 <span style={{fontSize:10,fontWeight:800,color:PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E",background:(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")+"18",border:`1px solid ${(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")}30`,borderRadius:20,padding:"2px 10px",fontFamily:MF,letterSpacing:"0.08em",textTransform:"uppercase"}}>
                   {PLANS.find(p=>p.id===currentPlan)?.label||"Pro"}
                 </span>
                 <span style={{fontSize:11,color:"#22C55E",cursor:"pointer",fontFamily:MF,fontWeight:600}} onClick={()=>fileRef.current?.click()}>
-                  {photoUploading ? L.uploading : L.changePhoto}
+                  {photoUploading ? T.acUploading : T.acChangePhoto}
                 </span>
               </div>
             </div>
@@ -1930,7 +1898,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
         {/* ── TABS ── */}
         <div style={{display:"flex",gap:4,padding:"20px 32px 0",borderBottom:`1px solid ${C.border}`,paddingBottom:0}}>
-          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab],["plan","💎 "+L.planTab]].map(([t,l])=>(
+          {[["profile","👤 "+T.acProfile],["security","🔒 "+T.acSecurity],["plan","💎 "+T.acPlan]].map(([t,l])=>(
             <button key={t} onClick={()=>{setTab(t);setMsg(null);setPlanMsg(null);setCurrentPwd("");setConfirmPlanChange(null);}}
               style={{padding:"10px 18px",borderRadius:"10px 10px 0 0",border:"none",borderBottom:tab===t?`2px solid ${t==="plan"?"#a855f7":"#22C55E"}`:"2px solid transparent",
                 background:"none",color:tab===t?(t==="plan"?"#a855f7":"#22C55E"):C.muted,
@@ -1953,17 +1921,17 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             {/* Username card */}
             <div style={{background:C.bg,border:`1px solid #22C55E25`,borderRadius:14,padding:"16px 18px",position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:"linear-gradient(90deg,#22C55E,#3b82f6)"}}/>
-              <div style={{fontSize:10,fontWeight:800,color:"#22C55E",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:MF}}>👤 Seu Username</div>
+              <div style={{fontSize:10,fontWeight:800,color:"#22C55E",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:MF}}>{L.usernameLabel}</div>
               {localUsername
                 ? <div style={{fontSize:20,fontWeight:800,color:C.text,fontFamily:"monospace",letterSpacing:"0.04em"}}>{localUsername}</div>
-                : <div style={{fontSize:13,color:C.muted,fontFamily:MF}}>⏳ Gerando seu username...</div>
+                : <div style={{fontSize:13,color:C.muted,fontFamily:MF}}>{L.usernameGenerating}</div>
               }
-              <div style={{fontSize:11,color:C.muted,marginTop:6,fontFamily:MF,lineHeight:1.5}}>Use este username para recuperar sua senha.</div>
+              <div style={{fontSize:11,color:C.muted,marginTop:6,fontFamily:MF,lineHeight:1.5}}>{L.usernameHint}</div>
             </div>
 
             {/* Display name */}
             <div>
-              <label style={labelS}>{L.name}</label>
+              <label style={labelS}>{T.acDisplayName}</label>
               <input value={displayName} onChange={e=>setDisplayName(e.target.value)}
                 placeholder={currentUser?.email?.split("@")[0]||"Seu nome"} style={iS}
                 onKeyDown={e=>e.key==="Enter"&&saveProfile()}
@@ -1973,13 +1941,13 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
             {/* Email (read-only) */}
             <div>
-              <label style={labelS}>{L.email}</label>
+              <label style={labelS}>{T.acEmail}</label>
               <input value={currentUser?.email||""} disabled style={{...iS,opacity:0.4,cursor:"not-allowed"}}/>
             </div>
 
             <button onClick={saveProfile} disabled={loading}
               style={{background:loading?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontFamily:MF,fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:14,letterSpacing:"0.02em",opacity:loading?0.7:1,transition:"opacity 0.2s"}}>
-              {loading?"Salvando...":L.save}
+              {loading?"...":T.acSave}
             </button>
           </>)}
 
@@ -1988,26 +1956,26 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             {/* Change email */}
             <div style={{background:C.bg,borderRadius:14,padding:"18px 20px",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:14,fontFamily:MF,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>📧</span> {L.newEmail}
+                <span style={{fontSize:16}}>📧</span> {T.acNewEmail}
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div>
-                  <label style={labelS}>{L.newEmail}</label>
+                  <label style={labelS}>{T.acNewEmail}</label>
                   <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="novo@email.com" style={iS}
                     onFocus={e=>e.target.style.borderColor="#3b82f6"} onBlur={e=>e.target.style.borderColor=C.border}/>
                 </div>
                 <div>
-                  <label style={labelS}>{L.currentPwd}</label>
+                  <label style={labelS}>{T.acCurrentPwd}</label>
                   <div style={{position:"relative"}}>
                     <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}
                       onFocus={e=>e.target.style.borderColor="#3b82f6"} onBlur={e=>e.target.style.borderColor=C.border}/>
                     <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:15}}>{showCurr?"🙈":"👁️"}</button>
                   </div>
                 </div>
-                <div style={{fontSize:11,color:C.muted,fontFamily:MF,lineHeight:1.5}}>ℹ️ {L.emailInfo}</div>
+                <div style={{fontSize:11,color:C.muted,fontFamily:MF,lineHeight:1.5}}>ℹ️ {T.acEmailInfo}</div>
                 <button onClick={saveEmail} disabled={loading||!newEmail||!currentPwd}
                   style={{background:loading||!newEmail||!currentPwd?"#1E293B":"linear-gradient(135deg,#3b82f6,#22C55E)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontFamily:MF,fontWeight:700,cursor:loading||!newEmail||!currentPwd?"not-allowed":"pointer",fontSize:13,opacity:loading||!newEmail||!currentPwd?0.4:1}}>
-                  {loading?"Enviando...":L.saveEmail}
+                  {loading?T.acProcessing:T.acSaveEmail}
                 </button>
               </div>
             </div>
@@ -2015,11 +1983,11 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             {/* Change password */}
             <div style={{background:C.bg,borderRadius:14,padding:"18px 20px",border:`1px solid ${C.border}`}}>
               <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:14,fontFamily:MF,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>🔑</span> {L.changePwd}
+                <span style={{fontSize:16}}>🔑</span> {T.acChangePwd}
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div>
-                  <label style={labelS}>{L.currentPwd}</label>
+                  <label style={labelS}>{T.acCurrentPwd}</label>
                   <div style={{position:"relative"}}>
                     <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}
                       onFocus={e=>e.target.style.borderColor="#22C55E"} onBlur={e=>e.target.style.borderColor=C.border}/>
@@ -2027,7 +1995,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                   </div>
                 </div>
                 <div>
-                  <label style={labelS}>{L.newPwd}</label>
+                  <label style={labelS}>{T.acNewPwd}</label>
                   <div style={{position:"relative"}}>
                     <input type={showNew?"text":"password"} value={newPwd} onChange={e=>setNewPwd(e.target.value)} style={iS}
                       onFocus={e=>e.target.style.borderColor="#22C55E"} onBlur={e=>e.target.style.borderColor=C.border}/>
@@ -2035,16 +2003,16 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                   </div>
                 </div>
                 <div>
-                  <label style={labelS}>{L.confirmPwd}</label>
+                  <label style={labelS}>{T.acConfirmPwd}</label>
                   <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)}
                     style={{...iS,borderColor:confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border}}
                     onFocus={e=>{ if(!confirmPwd||confirmPwd===newPwd) e.target.style.borderColor="#22C55E"; }}
                     onBlur={e=>{ e.target.style.borderColor=confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border; }}/>
-                  {confirmPwd&&confirmPwd!==newPwd&&<div style={{fontSize:11,color:"#ef4444",marginTop:5,fontFamily:MF,fontWeight:600}}>⚠ {L.pwdMismatch}</div>}
+                  {confirmPwd&&confirmPwd!==newPwd&&<div style={{fontSize:11,color:"#ef4444",marginTop:5,fontFamily:MF,fontWeight:600}}>⚠ {T.acPwdMismatch}</div>}
                 </div>
                 <button onClick={savePassword} disabled={loading||!currentPwd||!newPwd||!confirmPwd}
                   style={{background:loading||!currentPwd||!newPwd||!confirmPwd?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontFamily:MF,fontWeight:700,cursor:loading||!currentPwd||!newPwd||!confirmPwd?"not-allowed":"pointer",fontSize:13,opacity:loading||!currentPwd||!newPwd||!confirmPwd?0.4:1}}>
-                  {loading?"Salvando...":L.save}
+                  {loading?"...":T.acSave}
                 </button>
               </div>
             </div>
@@ -2055,7 +2023,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             {/* Current plan banner */}
             <div style={{background:C.bg,borderRadius:14,padding:"16px 18px",border:`1px solid ${(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")}30`,position:"relative",overflow:"hidden"}}>
               <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:PLANS.find(p=>p.id===currentPlan)?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)"}}/>
-              <div style={{fontSize:10,fontWeight:800,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF,marginBottom:6}}>Plano atual</div>
+              <div style={{fontSize:10,fontWeight:800,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF,marginBottom:6}}>{L.planCurrent}</div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <div style={{fontSize:22,fontWeight:900,color:PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E",fontFamily:MF}}>
                   {PLANS.find(p=>p.id===currentPlan)?.label}
@@ -2133,7 +2101,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                               borderRadius:8,padding:"7px 16px",letterSpacing:"0.03em",
                               cursor:"pointer"
                             }}>
-                              {isUpgrade ? "⬆ Upgrade — " + plan.price + (plan.period||"") : "⬇ Downgrade via Portal"}
+                              {isUpgrade ? `${L.planUpgrade} — ${plan.price}${plan.period||""}` : L.planDowngrade}
                             </span>
                           </div>
                         )}
@@ -2145,7 +2113,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             </div>
 
             <div style={{fontSize:11,color:C.muted,fontFamily:MF,lineHeight:1.6,textAlign:"center",padding:"0 8px"}}>
-              Mudanças de plano são aplicadas imediatamente. Integração com pagamentos em breve via Stripe.
+              {L.planNote}
             </div>
 
             {/* Checkout / Downgrade flow */}
@@ -2160,14 +2128,14 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
                     {/* DOWNGRADE STEP */}
                     {isDn&&(<>
-                      <div style={{fontSize:15,fontWeight:800,color:C.text,fontFamily:MF,marginBottom:8}}>⬇ Fazer Downgrade</div>
+                      <div style={{fontSize:15,fontWeight:800,color:C.text,fontFamily:MF,marginBottom:8}}>{L.downgradeTitle}</div>
                       <div style={{fontSize:13,color:C.muted,fontFamily:MF,marginBottom:16,lineHeight:1.6}}>
-                        Para fazer downgrade ou cancelar, acesse o <strong style={{color:C.text}}>Portal de Assinaturas Stripe</strong>. Lá você altera ou cancela com segurança — nenhum valor será cobrado após o cancelamento.
+                        {L.downgradeDesc}
                       </div>
                       <div style={{display:"flex",gap:8}}>
                         <button onClick={()=>{ window.open(STRIPE_PORTAL,"_blank"); setConfirmPlanChange(null); setCheckoutStep(null); }}
                           style={{flex:1,background:"linear-gradient(135deg,#475569,#334155)",color:"#fff",border:"none",borderRadius:8,padding:"12px",fontFamily:MF,fontWeight:700,cursor:"pointer",fontSize:13}}>
-                          🔗 Abrir Portal de Assinaturas
+                          {L.portalBtn}
                         </button>
                         <button onClick={()=>{setConfirmPlanChange(null);setCheckoutStep(null);}}
                           style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
@@ -2180,7 +2148,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                     {checkoutStep==="card"&&(<>
                       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
                         <div style={{fontSize:15,fontWeight:800,color:C.text,fontFamily:MF}}>
-                          ⬆ Upgrade para <span style={{color:targetPlan?.color}}>{confirmPlanChange.label}</span>
+                          {T.acUpgradeTitle} <span style={{color:targetPlan?.color}}>{confirmPlanChange.label}</span>
                         </div>
                         <div style={{fontSize:14,fontWeight:900,color:targetPlan?.color,fontFamily:MF}}>
                           {targetPlan?.price}<span style={{fontSize:11,fontWeight:500,color:C.muted}}>{targetPlan?.period}</span>
@@ -2189,7 +2157,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
                       {/* Stripe Card Element mount point */}
                       <div style={{marginBottom:14}}>
-                        <label style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF}}>Dados do Cartão</label>
+                        <label style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF}}>{L.cardLabel}</label>
                         <div id="stripe-card-mount" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"16px 18px",transition:"border-color 0.2s",minHeight:52,lineHeight:"normal"}}/>
                       </div>
 
@@ -2201,18 +2169,18 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
                       {/* Coupon field */}
                       <div style={{marginBottom:14}}>
-                        <label style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF}}>Cupom de Desconto</label>
+                        <label style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF}}>{L.couponLabel}</label>
                         <div style={{display:"flex",gap:8}}>
                           <input
                             value={couponCode}
                             onChange={e=>{setCouponCode(e.target.value.toUpperCase());setCouponStatus(null);}}
                             onKeyDown={e=>e.key==="Enter"&&validateCoupon()}
-                            placeholder="Ex: BULLNOTE20"
+                            placeholder={L.couponPlaceholder}
                             style={{flex:1,background:C.card,border:`1px solid ${couponStatus?.valid?"#22C55E":couponStatus?.valid===false?"#ef4444":C.border}`,borderRadius:10,color:C.text,padding:"11px 14px",fontSize:13,outline:"none",fontFamily:MF,transition:"border-color 0.2s",letterSpacing:"0.05em",fontWeight:600}}
                           />
                           <button onClick={validateCoupon} disabled={!couponCode.trim()||couponLoading}
                             style={{background:couponCode.trim()&&!couponLoading?"linear-gradient(135deg,#22C55E,#3b82f6)":"#1E293B",color:"#fff",border:"none",borderRadius:10,padding:"0 16px",fontFamily:MF,fontWeight:700,cursor:couponCode.trim()&&!couponLoading?"pointer":"not-allowed",fontSize:12,whiteSpace:"nowrap",opacity:couponCode.trim()&&!couponLoading?1:0.4,transition:"all 0.2s"}}>
-                            {couponLoading?"⏳":"Aplicar"}
+                            {couponLoading?"⏳":T.acApplyCoupon}
                           </button>
                         </div>
                         {couponStatus&&(
@@ -2229,7 +2197,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                       </div>
 
                       <div style={{fontSize:11,color:C.muted,fontFamily:MF,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
-                        <span>🔒</span> Pagamento seguro via Stripe · Cancele a qualquer momento
+                        <span>🔒</span> {L.secureNote.replace("🔒 ","")}
                       </div>
 
                       {/* Show discounted price when coupon applied */}
@@ -2266,7 +2234,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                           <div style={{display:"flex",gap:8}}>
                             <button onClick={handlePayment} disabled={!cardComplete||payLoading}
                               style={{flex:1,background:!cardComplete||payLoading?"#1E293B":tp?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"13px",fontFamily:MF,fontWeight:700,cursor:!cardComplete||payLoading?"not-allowed":"pointer",fontSize:13,opacity:!cardComplete||payLoading?0.5:1,transition:"all 0.2s"}}>
-                              {payLoading ? "⏳ Processando..." : `💳 Pagar ${displayPrice}${tp?.period}`}
+                              {payLoading ? L.paying : `${L.payBtn} ${displayPrice}${tp?.period}`}
                             </button>
                             <button onClick={()=>{setConfirmPlanChange(null);setCheckoutStep(null);setPlanMsg(null);setCouponCode('');setCouponStatus(null);}}
                               style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
@@ -2289,7 +2257,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
               onMouseEnter={e=>{e.currentTarget.style.borderColor="#ef4444";e.currentTarget.style.color="#ef4444";}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}
             >
-              ⏻ {L.logout}
+              ⏻ {T.acLogout}
             </button>
           </div>
         </div>
@@ -2361,7 +2329,7 @@ function App(){
       thisTrade:"Este trade", cumTotal:"Total acumulado", dailyPnl:"P&L do dia",
       tradeCount:(n)=>`${n} trade${n!==1?'s':''}`,
       // Trade form
-      newTrade:"Novo Trade", editTrade:"Editar Trade", saveTrade:"Salvar Trade", saving:"Salvando...",
+      newTrade:"Novo Trade", editTrade:"Editar Trade", saveTrade:"Salvar Trade", saving:"...",
       secIdentification:"Identificação", secExecution:"Execução", secPriceLevels:"Níveis de Preço",
       secPartials:"Parciais", secFinalTarget:"Alvo Final & Resultado", secReview:"Avaliação & Psicologia",
       secChart:"Gráfico do Trade",
@@ -2406,6 +2374,32 @@ function App(){
       statSummary:"Resumo Estatístico",
       expectancy:"Expectativa / Trade", stratDiscipline:"Disciplina de Estratégia",
       bestTrade:"Melhor Trade", worstTrade:"Pior Trade",
+      // Account Modal
+      acTitle:"Minha Conta", acProfile:"Perfil", acSecurity:"Segurança", acPlan:"Plano",
+      acDisplayName:"Nome de exibição", acEmail:"Email atual", acNewEmail:"Novo email",
+      acEmailInfo:"Um link de confirmação será enviado para o novo email.",
+      acEmailSent:"✅ Link enviado! Verifique sua caixa de entrada.",
+      acChangePwd:"Alterar senha", acCurrentPwd:"Senha atual", acNewPwd:"Nova senha", acConfirmPwd:"Confirmar nova senha",
+      acSave:"Salvar alterações", acSaveEmail:"Enviar confirmação", acLogout:"Sair da conta",
+      acSuccess:"Alterações salvas!", acPwdMismatch:"As senhas não coincidem.", acPwdShort:"Mínimo 6 caracteres.",
+      acChangePhoto:"Alterar foto", acUploading:T.acProcessing,
+      acUsername:"Seu Username", acUsernameHint:"Use este username para recuperar sua senha.",
+      acGenerating:T.acGenerating,
+      acPlanCurrent:T.acPlanCurrent, acPlanActive:T.acPlanActive,
+      acUpgrade:"⬆ Upgrade", acDowngrade:T.acDowngrade,
+      acUpgradeTitle:"⬆ Upgrade para", acDowngradeTitle:T.acDowngrade,
+      acDowngradeInfo:"Para fazer downgrade ou cancelar, acesse o Portal de Assinaturas Stripe. Lá você altera ou cancela com segurança.",
+      acOpenPortal:T.acOpenPortal,
+      acCardLabel:T.acCardLabel, acCouponLabel:T.acCouponLabel,
+      acCouponPlaceholder:T.acCouponPlaceholder, acApplyCoupon:T.acApplyCoupon,
+      acCouponApplied:"aplicado", acSecure:"{T.acSecure}",
+      acPay:"💳 Pagar", acProcessing:T.acProcessing,
+      acCancel:"Cancelar", acPlanUpdated:"✅ Plano ativado com sucesso!",
+      acPlanError:"Erro ao iniciar pagamento. Tente novamente.",
+      acCardDeclined:"Seu cartão foi recusado. Verifique os dados e tente novamente.",
+      acPlanNote:"Mudanças de plano são aplicadas imediatamente.",
+      acPerMonth:T.acPerMonth, acMonthly:"por mês",
+      acPopular:T.acPopular, acBestValue:"MELHOR OFERTA",
     },
     es: {
       dashboard:"Dashboard", trades:"Trades", analysis:"Análisis", calendar:"Calendario", news:"Calendario Económico",
@@ -2467,6 +2461,32 @@ function App(){
       statSummary:"Resumen Estadístico",
       expectancy:"Expectativa / Operación", stratDiscipline:"Disciplina de Estrategia",
       bestTrade:"Mejor Operación", worstTrade:"Peor Operación",
+      // Account Modal
+      acTitle:"Mi Cuenta", acProfile:"Perfil", acSecurity:"Seguridad", acPlan:"Plan",
+      acDisplayName:"Nombre visible", acEmail:"Email actual", acNewEmail:"Nuevo email",
+      acEmailInfo:"Se enviará un enlace de confirmación al nuevo email.",
+      acEmailSent:"✅ ¡Enlace enviado! Revisa tu bandeja de entrada.",
+      acChangePwd:"Cambiar contraseña", acCurrentPwd:"Contraseña actual", acNewPwd:"Nueva contraseña", acConfirmPwd:"Confirmar contraseña",
+      acSave:"Guardar cambios", acSaveEmail:"Enviar confirmación", acLogout:"Cerrar sesión",
+      acSuccess:"¡Cambios guardados!", acPwdMismatch:"Las contraseñas no coinciden.", acPwdShort:"Mínimo 6 caracteres.",
+      acChangePhoto:"Cambiar foto", acUploading:"Subiendo...",
+      acUsername:"Tu Usuario", acUsernameHint:"Usa este usuario para recuperar tu contraseña.",
+      acGenerating:"⏳ Generando tu usuario...",
+      acPlanCurrent:"Plan actual", acPlanActive:"✓ ACTIVO",
+      acUpgrade:"⬆ Upgrade", acDowngrade:T.acDowngrade,
+      acUpgradeTitle:"⬆ Upgrade a", acDowngradeTitle:"⬇ Hacer Downgrade",
+      acDowngradeInfo:"Para hacer downgrade o cancelar, accede al Portal de Suscripciones Stripe. Allí puedes cambiar o cancelar de forma segura.",
+      acOpenPortal:"🔗 Abrir Portal de Suscripciones",
+      acCardLabel:"Datos de la Tarjeta", acCouponLabel:"Cupón de Descuento",
+      acCouponPlaceholder:"Ej: BULLNOTE20", acApplyCoupon:T.acApplyCoupon,
+      acCouponApplied:T.acCouponApplied, acSecure:"Pago seguro vía Stripe · Cancela cuando quieras",
+      acPay:"💳 Pagar", acProcessing:"⏳ Procesando...",
+      acCancel:"Cancelar", acPlanUpdated:"✅ ¡Plan activado con éxito!",
+      acPlanError:"Error al iniciar el pago. Inténtalo de nuevo.",
+      acCardDeclined:"Tu tarjeta fue rechazada. Verifica los datos e inténtalo de nuevo.",
+      acPlanNote:"Los cambios de plan se aplican de inmediato.",
+      acPerMonth:"/mes", acMonthly:"por mes",
+      acPopular:T.acPopular, acBestValue:"MEJOR OFERTA",
     },
     en: {
       dashboard:"Dashboard", trades:"Trades", analysis:"Analysis", calendar:"Calendar", news:"Economic Calendar",
@@ -2528,6 +2548,32 @@ function App(){
       statSummary:"Statistical Summary",
       expectancy:"Expectancy / Trade", stratDiscipline:"Strategy Discipline",
       bestTrade:"Best Trade", worstTrade:"Worst Trade",
+      // Account Modal
+      acTitle:"My Account", acProfile:"Profile", acSecurity:"Security", acPlan:"Plan",
+      acDisplayName:"Display name", acEmail:"Current email", acNewEmail:"New email",
+      acEmailInfo:"A confirmation link will be sent to the new email.",
+      acEmailSent:"✅ Confirmation link sent! Check your inbox.",
+      acChangePwd:"Change password", acCurrentPwd:"Current password", acNewPwd:"New password", acConfirmPwd:"Confirm new password",
+      acSave:"Save changes", acSaveEmail:"Send confirmation", acLogout:"Sign out",
+      acSuccess:"Changes saved!", acPwdMismatch:"Passwords do not match.", acPwdShort:"Minimum 6 characters.",
+      acChangePhoto:"Change photo", acUploading:"Uploading...",
+      acUsername:"Your Username", acUsernameHint:"Use this username to recover your password.",
+      acGenerating:"⏳ Generating your username...",
+      acPlanCurrent:"Current plan", acPlanActive:"✓ ACTIVE",
+      acUpgrade:"⬆ Upgrade", acDowngrade:T.acDowngrade,
+      acUpgradeTitle:"⬆ Upgrade to", acDowngradeTitle:"⬇ Downgrade Plan",
+      acDowngradeInfo:"To downgrade or cancel, open the Stripe Subscription Portal. You can change or cancel safely there.",
+      acOpenPortal:{T.acOpenPortal},
+      acCardLabel:"Card Details", acCouponLabel:"Discount Coupon",
+      acCouponPlaceholder:"E.g. BULLNOTE20", acApplyCoupon:"Apply",
+      acCouponApplied:"applied", acSecure:"Secure payment via Stripe · Cancel anytime",
+      acPay:"💳 Pay", acProcessing:"⏳ Processing...",
+      acCancel:"Cancel", acPlanUpdated:"✅ Plan activated successfully!",
+      acPlanError:"Could not start payment. Please try again.",
+      acCardDeclined:"Your card was declined. Please check your details and try again.",
+      acPlanNote:"Plan changes are applied immediately.",
+      acPerMonth:"/mo", acMonthly:"per month",
+      acPopular:T.acPopular, acBestValue:T.acBestValue,
     },
   };
   const T = TRANSLATIONS[lang] || TRANSLATIONS["en"];
@@ -3689,7 +3735,7 @@ function App(){
 
       {/* ACCOUNT MODAL */}
       {showAccount&&(
-        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername}/>
+        <AccountModal C={C} currentUser={currentUser} onClose={()=>setShowAccount(false)} onLogout={logout} lang={lang} T={T} userPhotoURL={userPhotoURL} onPhotoChange={setUserPhotoURL} userUsername={userUsername}/>
       )}
 
       {/* CONFIRM DELETE */}
