@@ -2211,16 +2211,45 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                         <span>🔒</span> Pagamento seguro via Stripe · Cancele a qualquer momento
                       </div>
 
-                      <div style={{display:"flex",gap:8}}>
-                        <button onClick={handlePayment} disabled={!cardComplete||payLoading}
-                          style={{flex:1,background:!cardComplete||payLoading?"#1E293B":targetPlan?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"13px",fontFamily:MF,fontWeight:700,cursor:!cardComplete||payLoading?"not-allowed":"pointer",fontSize:13,opacity:!cardComplete||payLoading?0.5:1,transition:"all 0.2s"}}>
-                          {payLoading ? "⏳ Processando..." : `💳 Pagar ${targetPlan?.price}${targetPlan?.period}`}
-                        </button>
+                      {/* Show discounted price when coupon applied */}
+                      {(()=>{
+                        let displayPrice = targetPlan?.price || "";
+                        let originalPrice = null;
+                        if(couponStatus?.valid && couponStatus?.discount){
+                          const base = parseFloat((targetPlan?.price||"0").replace("$",""));
+                          const discountStr = couponStatus.discount;
+                          if(discountStr.includes("%")){
+                            const pct = parseFloat(discountStr);
+                            const discounted = base * (1 - pct/100);
+                            originalPrice = `$${base.toFixed(2)}`;
+                            displayPrice = `$${discounted.toFixed(2)}`;
+                          } else if(discountStr.includes("$")){
+                            const amt = parseFloat(discountStr.replace("$","").replace(" off",""));
+                            const discounted = Math.max(0, base - amt);
+                            originalPrice = `$${base.toFixed(2)}`;
+                            displayPrice = `$${discounted.toFixed(2)}`;
+                          }
+                        }
+                        return (<>
+                          {originalPrice&&(
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",background:"#22C55E10",border:"1px solid #22C55E30",borderRadius:8}}>
+                              <span style={{fontSize:12,color:C.muted,fontFamily:MF,textDecoration:"line-through"}}>{originalPrice}{targetPlan?.period}</span>
+                              <span style={{fontSize:16,fontWeight:900,color:"#22C55E",fontFamily:MF}}>{displayPrice}{targetPlan?.period}</span>
+                              <span style={{fontSize:11,color:"#22C55E",fontFamily:MF,fontWeight:600}}>({couponStatus.discount} aplicado!)</span>
+                            </div>
+                          )}
+                          <div style={{display:"flex",gap:8}}>
+                            <button onClick={handlePayment} disabled={!cardComplete||payLoading}
+                              style={{flex:1,background:!cardComplete||payLoading?"#1E293B":targetPlan?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"13px",fontFamily:MF,fontWeight:700,cursor:!cardComplete||payLoading?"not-allowed":"pointer",fontSize:13,opacity:!cardComplete||payLoading?0.5:1,transition:"all 0.2s"}}>
+                              {payLoading ? "⏳ Processando..." : `💳 Pagar ${displayPrice}${targetPlan?.period}`}
+                            </button>
                         <button onClick={()=>{setConfirmPlanChange(null);setCheckoutStep(null);setPlanMsg(null);setCouponCode('');setCouponStatus(null);}}
-                          style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
-                          Cancelar
-                        </button>
-                      </div>
+                              style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </>);
+                      })()}
                     </>)}
                   </div>
                 </div>
