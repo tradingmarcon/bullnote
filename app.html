@@ -1599,19 +1599,74 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     await window.fbReauth(currentUser, cred);
   }
 
+  const STRIPE_KEY = "pk_live_51T9Wt2KENdCwchGt22JsKVWVCAR7w5lKlnYceyXp8TmihBgCaKdwC4VonoGhtj1VTenEw6kgrevNP5cnx2gyTJtV00DFTrKe7K";
+  const STRIPE_PRICES = { pro: "price_1T9X11KENdCwchGtThy3BGAV", premium: "price_1T9X1OKENdCwchGt6MpoJSEy" };
+  const STRIPE_PORTAL = "https://billing.stripe.com/p/login/4gMeVe1vlfE1auDdf72ZO00";
+
   async function changePlan(newPlan){
-    setPlanLoading(true); setPlanMsg(null);
-    try{
-      await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser.uid}/settings`,"profile"),
-        {plan: newPlan},{merge:true});
-      setCurrentPlan(newPlan);
-      setPlanMsg({type:"success", text:"Plano atualizado com sucesso!"});
+    const newIdx = planOrder.indexOf(newPlan);
+    const isUpgrade = newIdx > currentPlanIdx;
+    const isDowngrade = newIdx < currentPlanIdx;
+
+    // DOWNGRADE or CANCEL → send to Stripe Customer Portal
+    if(isDowngrade){
+      window.open(STRIPE_PORTAL, "_blank");
       setConfirmPlanChange(null);
-    }catch(e){
-      setPlanMsg({type:"error", text:"Erro ao atualizar plano. Tente novamente."});
+      return;
     }
-    setPlanLoading(false);
+
+    // UPGRADE → Stripe Checkout
+    if(isUpgrade){
+      setPlanLoading(true); setPlanMsg(null);
+      try{
+        // Load Stripe.js dynamically if not already loaded
+        if(!window.Stripe){
+          await new Promise((res,rej)=>{
+            const s = document.createElement("script");
+            s.src = "https://js.stripe.com/v3/";
+            s.onload = res; s.onerror = rej;
+            document.head.appendChild(s);
+          });
+        }
+        const stripe = window.Stripe(STRIPE_KEY);
+        const priceId = STRIPE_PRICES[newPlan];
+        if(!priceId){ setPlanMsg({type:"error",text:"Plano inválido."}); setPlanLoading(false); return; }
+
+        const { error } = await stripe.redirectToCheckout({
+          lineItems: [{ price: priceId, quantity: 1 }],
+          mode: "subscription",
+          successUrl: window.location.href + "?plan_success=" + newPlan,
+          cancelUrl: window.location.href + "?plan_cancel=1",
+          customerEmail: currentUser?.email || undefined,
+        });
+        if(error){ setPlanMsg({type:"error", text: error.message}); }
+      }catch(e){
+        setPlanMsg({type:"error", text:"Erro ao redirecionar para o pagamento."});
+        console.error(e);
+      }
+      setPlanLoading(false);
+      return;
+    }
   }
+
+  // Handle Stripe return — update plan in Firestore after successful checkout
+  React.useEffect(()=>{
+    const params = new URLSearchParams(window.location.search);
+    const successPlan = params.get("plan_success");
+    if(successPlan && currentUser){
+      window.fsSetDoc(
+        window.fsDoc(window.db,`users/${currentUser.uid}/settings`,"profile"),
+        {plan: successPlan},{merge:true}
+      ).then(()=>{
+        setCurrentPlan(successPlan);
+        setPlanMsg({type:"success", text:"✅ Plano ativado com sucesso!"});
+        // Clean URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete("plan_success");
+        window.history.replaceState({}, "", url.toString());
+      }).catch(console.error);
+    }
+  },[currentUser?.uid]);
 
   async function uploadPhoto(file){
     if(!file) return;
@@ -1762,7 +1817,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(8px)"}} onClick={onClose}>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,width:"100%",maxWidth:560,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.7)",fontFamily:MF}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,width:"100%",maxWidth:820,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.7)",fontFamily:MF}} onClick={e=>e.stopPropagation()}>
 
         {/* ── HEADER ── */}
         <div style={{padding:"28px 32px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -1995,13 +2050,15 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                         {!isActive&&(
                           <div style={{marginTop:12}}>
                             <span style={{
-                              display:"inline-block",fontSize:11,fontWeight:700,fontFamily:MF,
+                              display:"inline-flex",alignItems:"center",gap:6,
+                              fontSize:11,fontWeight:700,fontFamily:MF,
                               color:isUpgrade?"#fff":C.muted,
                               background:isUpgrade?plan.gradient:"none",
                               border:isUpgrade?"none":`1px solid ${C.border}`,
-                              borderRadius:8,padding:"6px 16px",letterSpacing:"0.03em"
+                              borderRadius:8,padding:"7px 16px",letterSpacing:"0.03em",
+                              cursor:"pointer"
                             }}>
-                              {isUpgrade?"⬆ Fazer Upgrade":"⬇ Fazer Downgrade"}
+                              {isUpgrade ? "⬆ Upgrade — " + plan.price + plan.period : "⬇ Downgrade via Portal"}
                             </span>
                           </div>
                         )}
@@ -2017,26 +2074,36 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
             </div>
 
             {/* Confirm plan change dialog */}
-            {confirmPlanChange&&(
-              <div style={{background:C.bg,border:`1px solid ${(PLANS.find(p=>p.id===confirmPlanChange.plan)?.color||"#22C55E")}40`,borderRadius:14,padding:"18px 20px"}}>
-                <div style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:MF,marginBottom:6}}>
-                  Confirmar mudança de plano?
+            {confirmPlanChange&&(()=>{
+              const targetPlan = PLANS.find(p=>p.id===confirmPlanChange.plan);
+              const targetIdx  = planOrder.indexOf(confirmPlanChange.plan);
+              const isUp = targetIdx > currentPlanIdx;
+              return (
+                <div style={{background:C.bg,border:`1px solid ${targetPlan?.color||"#22C55E"}40`,borderRadius:14,padding:"20px 22px",position:"relative",overflow:"hidden"}}>
+                  <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:targetPlan?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)"}}/>
+                  <div style={{fontSize:15,fontWeight:800,color:C.text,fontFamily:MF,marginBottom:6,display:"flex",alignItems:"center",gap:8}}>
+                    {isUp ? "⬆ Fazer Upgrade" : "⬇ Fazer Downgrade"}
+                  </div>
+                  <div style={{fontSize:13,color:C.muted,fontFamily:MF,marginBottom:16,lineHeight:1.6}}>
+                    {isUp ? (<>
+                      Você será redirecionado para o <strong style={{color:C.text}}>checkout seguro do Stripe</strong> para ativar o plano <strong style={{color:targetPlan?.color}}>{confirmPlanChange.label}</strong> por <strong style={{color:targetPlan?.color}}>{targetPlan?.price}{targetPlan?.period}</strong>.
+                    </>) : (<>
+                      Para fazer o downgrade ou cancelar, você será redirecionado para o <strong style={{color:C.text}}>portal de assinaturas</strong>. Lá você pode alterar ou cancelar sua assinatura com segurança.
+                    </>)}
+                  </div>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>changePlan(confirmPlanChange.plan)} disabled={planLoading}
+                      style={{flex:1,background:planLoading?"#1E293B":(isUp?targetPlan?.gradient:"linear-gradient(135deg,#475569,#334155)"),color:"#fff",border:"none",borderRadius:8,padding:"12px",fontFamily:MF,fontWeight:700,cursor:planLoading?"not-allowed":"pointer",fontSize:13,letterSpacing:"0.02em"}}>
+                      {planLoading ? "Redirecionando..." : isUp ? "💳 Ir para o Checkout" : "🔗 Abrir Portal de Assinaturas"}
+                    </button>
+                    <button onClick={()=>setConfirmPlanChange(null)}
+                      style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
-                <div style={{fontSize:12,color:C.muted,fontFamily:MF,marginBottom:14,lineHeight:1.5}}>
-                  Você vai mudar do plano <strong style={{color:C.text}}>{PLANS.find(p=>p.id===currentPlan)?.label}</strong> para o plano <strong style={{color:PLANS.find(p=>p.id===confirmPlanChange.plan)?.color}}>{confirmPlanChange.label}</strong>.
-                </div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>changePlan(confirmPlanChange.plan)} disabled={planLoading}
-                    style={{flex:1,background:PLANS.find(p=>p.id===confirmPlanChange.plan)?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontFamily:MF,fontWeight:700,cursor:planLoading?"not-allowed":"pointer",fontSize:13}}>
-                    {planLoading?"Atualizando...":"Confirmar"}
-                  </button>
-                  <button onClick={()=>setConfirmPlanChange(null)}
-                    style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"11px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </>)}
 
           {/* Sign out */}
