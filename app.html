@@ -61,9 +61,10 @@
 </script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Barlow Condensed', sans-serif; }
-  input, select, textarea, button { font-family: 'Barlow Condensed', sans-serif; }
-  html, body { background: #0f1117; font-family: 'Barlow Condensed', sans-serif; height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; max-width: 100vw; }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Montserrat', 'Barlow Condensed', sans-serif; }
+  input, select, textarea, button { font-family: 'Montserrat', 'Barlow Condensed', sans-serif; }
+  html, body { background: #060B14; font-family: 'Montserrat', 'Barlow Condensed', sans-serif; height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; max-width: 100vw; }
+  #root { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.02) 1px, transparent 0); background-size: 32px 32px; }
   #root { min-height: 100vh; display: flex; flex-direction: column; }
   * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -350,38 +351,42 @@ const EMPTY_FORM = {
 };
 
 const DARK = {
-  bg:"#0F172A",
-  panel:"#0d1424",
-  card:"#1E293B",
-  border:"#334155",
-  borderHi:"#3d4f66",
-  accent:"#22C55E",
-  blue:"#22C55E",     
-  green:"#10B981",    
-  red:"#EF4444",      
-  amber:"#F59E0B",    
-  purple:"#16A34A",   
-  cyan:"#10B981",     
-  text:"#FFFFFF",     
-  muted:"#475569",    
-  sub:"#94A3B8",      
+  bg:"#060B14",
+  panel:"#080E1A",
+  card:"#0D1520",
+  border:"#1a2640",
+  borderHi:"#253550",
+  accent:"#00FF87",
+  blue:"#3b82f6",
+  green:"#00FF87",
+  red:"#FF4560",
+  amber:"#FFB800",
+  purple:"#a855f7",
+  cyan:"#00E5FF",
+  text:"#E8F0FE",
+  muted:"#4a5f7a",
+  sub:"#7a94b8",
+  glow:"#00FF8720",
+  cardGlow:"rgba(0,255,135,0.04)",
 };
 const LIGHT = {
-  bg:"#FFFFFF",
-  panel:"#F1F5F9",
-  card:"#F1F5F9",
-  border:"#CBD5E1",
-  borderHi:"#94A3B8",
-  accent:"#22C55E",
-  blue:"#22C55E",
-  green:"#10B981",
-  red:"#EF4444",
-  amber:"#F59E0B",
-  purple:"#16A34A",
-  cyan:"#10B981",
-  text:"#0F172A",
-  muted:"#475569",
-  sub:"#475569",
+  bg:"#F5F3EF",
+  panel:"#EDEAE3",
+  card:"#FFFFFF",
+  border:"#D4CFC5",
+  borderHi:"#B8B0A0",
+  accent:"#059669",
+  blue:"#2563EB",
+  green:"#059669",
+  red:"#DC2626",
+  amber:"#D97706",
+  purple:"#7C3AED",
+  cyan:"#0891B2",
+  text:"#1A1410",
+  muted:"#6B6355",
+  sub:"#4A4035",
+  glow:"#05966910",
+  cardGlow:"rgba(5,150,105,0.03)",
 };
 
 let C = DARK;
@@ -2805,10 +2810,64 @@ function App(){
         .icon-btn{background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;font-family:inherit}
         .icon-btn:hover{background:${C.border}}
         @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-        .fade-in{animation:fadeIn 0.3s ease forwards}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        .live-dot{animation:pulse 2s ease-in-out infinite}
+        /* ── MONTSERRAT FONT ── */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
+        /* ── ANIMATIONS ── */
+        .fade-in{animation:fadeIn 0.4s cubic-bezier(0.16,1,0.3,1) forwards}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}
+        .live-dot{animation:pulse 2.5s ease-in-out infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        @keyframes glow-pulse{0%,100%{box-shadow:0 0 20px var(--accent-glow,#00FF8720)}50%{box-shadow:0 0 35px var(--accent-glow,#00FF8740)}}
+        @keyframes slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes number-pop{0%{transform:scale(0.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+
+        /* ── METRIC CARDS ── */
+        .metric-card{
+          transition:all 0.25s cubic-bezier(0.16,1,0.3,1);
+          position:relative;
+          overflow:hidden;
+        }
+        .metric-card::before{
+          content:'';
+          position:absolute;
+          inset:0;
+          background:linear-gradient(135deg,var(--card-glow,transparent) 0%,transparent 60%);
+          pointer-events:none;
+          opacity:0;
+          transition:opacity 0.25s;
+        }
+        .metric-card:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,0.4)}
+        .metric-card:hover::before{opacity:1}
+        .metric-value{animation:number-pop 0.5s cubic-bezier(0.16,1,0.3,1) both}
+
+        /* ── FILTER CHIPS ── */
+        .chip-btn{transition:all 0.15s ease}
+        .chip-btn:hover{transform:translateY(-1px)}
+
+        /* ── NAV TABS ── */
+        .tab-btn{transition:all 0.2s ease;position:relative;overflow:hidden}
+        .tab-btn::after{
+          content:'';position:absolute;bottom:0;left:50%;right:50%;height:2px;
+          background:linear-gradient(90deg,#00FF87,#00E5FF);
+          transition:all 0.25s ease;border-radius:2px;
+        }
+        .tab-btn.active::after{left:12px;right:12px}
+
+        /* ── PROGRESS BARS ── */
+        .progress-bar{transition:width 0.8s cubic-bezier(0.16,1,0.3,1)}
+
+        /* ── TABLE ROWS ── */
+        .trade-row{transition:background 0.12s ease}
+
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar{width:4px;height:4px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:#1a2640;border-radius:4px}
+        ::-webkit-scrollbar-thumb:hover{background:#253550}
+
         /* ── RESPONSIVE ─────────────────────── */
         *{box-sizing:border-box}
         .app-header-inner{padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:64px;gap:8px;width:100%}
@@ -2883,18 +2942,23 @@ function App(){
       `}</style>
 
       {/* HEADER */}
-      <header style={{borderBottom:`1px solid ${C.border}`,background:C.panel,position:"sticky",top:0,zIndex:100}}>
+      <header style={{borderBottom:`1px solid ${C.border}`,background:theme==="dark"?"rgba(6,11,20,0.95)":"rgba(245,243,239,0.95)",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)"}}>
         <div className="app-header-inner">
-          <div style={{display:"flex",alignItems:"center",gap:14}}>
-            <img src={theme==="dark"?"image_dark.png":"image2.png"} style={{height:56,width:"auto",flexShrink:0}}/>
-            <div style={{display:"flex",alignItems:"center",gap:5,marginLeft:4,padding:"3px 10px",border:`1px solid ${C.green}40`,borderRadius:20,background:`${C.green}10`}}>
-              <div className="live-dot" style={{width:6,height:6,borderRadius:"50%",background:C.green}}/>
-              <span style={{fontSize:11,color:C.green,fontWeight:600}}>Live</span>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <img src={theme==="dark"?"image_dark.png":"image2.png"} style={{height:52,width:"auto",flexShrink:0}}/>
+            <div style={{display:"flex",alignItems:"center",gap:5,padding:"3px 10px",border:`1px solid ${C.green}50`,borderRadius:20,background:`${C.green}12`,boxShadow:`0 0 12px ${C.green}20`}}>
+              <div className="live-dot" style={{width:5,height:5,borderRadius:"50%",background:C.green,boxShadow:`0 0 6px ${C.green}`}}/>
+              <span style={{fontSize:10,color:C.green,fontWeight:700,letterSpacing:"0.08em"}}>LIVE</span>
             </div>
           </div>
           <nav className="app-nav-wrap">
             {[["dashboard",T.dashboard],["trades",T.trades],["analise",T.analysis],["calendar",T.calendar],["news",T.news]].map(([v,l])=>(
-              <button key={v} className="tab-btn" onClick={()=>setTab(v)} style={{padding:"10px 28px",fontSize:15,fontWeight:700,borderRadius:10,color:tab===v?C.text:C.muted,background:tab===v?C.border:"transparent",border:"none"}}>
+              <button key={v} className={`tab-btn${tab===v?" active":""}`} onClick={()=>setTab(v)}
+                style={{padding:"10px 24px",fontSize:13,fontWeight:700,borderRadius:8,
+                  color:tab===v?C.text:C.muted,
+                  background:tab===v?`${C.border}`:"transparent",
+                  border:"none",fontFamily:"'Montserrat',sans-serif",letterSpacing:"0.02em",
+                  cursor:"pointer"}}>
                 {l}
               </button>
             ))}
@@ -2939,7 +3003,7 @@ function App(){
               </div>
             </button>
 
-            <button className="hdr-hide-mob" onClick={()=>setShowManage(true)} style={{background:"none",color:C.sub,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",height:43}}>⚙ <span className="btn-lbl">{T.manage}</span></button>
+            <button className="hdr-hide-mob" onClick={()=>setShowManage(true)} style={{background:"none",color:C.sub,border:`1px solid ${C.border}`,borderRadius:10,padding:"10px 20px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Montserrat',sans-serif",height:43,letterSpacing:"0.03em"}}>⚙ <span className="btn-lbl">{T.manage}</span></button>
             {isDemoUser && (isDemoActive
               ? <button onClick={clearAllTrades} disabled={seeding} style={{background:seeding?"#334155":"linear-gradient(135deg,#ef4444,#b91c1c)",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontSize:14,fontWeight:700,cursor:seeding?"not-allowed":"pointer",fontFamily:"inherit",height:43,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:6}}>
                   {seeding?"⏳":"🗑️"}<span className="btn-lbl"> {seeding?"Limpando...":"Limpar Dados"}</span>
@@ -2948,7 +3012,7 @@ function App(){
                   {seeding?"⏳":"🎲"}<span className="btn-lbl"> {seeding?"Carregando...":"Demo Data"}</span>
                 </button>
             )}
-            <button onClick={openNew} style={{background:`linear-gradient(135deg,${C.accent},${C.purple})`,color:"#fff",border:"none",borderRadius:10,padding:"10px 22px",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"inherit",height:43}}><span className="btn-lbl">{T.addTrade}</span></button>
+            <button onClick={openNew} style={{background:`linear-gradient(135deg,${C.green},${C.cyan})`,color:"#000",border:"none",borderRadius:10,padding:"10px 22px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"'Montserrat',sans-serif",height:43,letterSpacing:"0.05em",boxShadow:`0 0 20px ${C.green}40`}}><span className="btn-lbl">{T.addTrade}</span></button>
             {/* User + logout */}
             <div className="hdr-hide-mob" style={{display:"flex",alignItems:"center",gap:8,background:C.panel,border:`1px solid ${C.border}`,borderRadius:10,padding:"6px 12px",height:43,boxSizing:"border-box",cursor:"pointer"}} onClick={()=>setShowAccount(true)}>
               {userPhotoURL
@@ -2977,7 +3041,7 @@ function App(){
         </div>
       </header>
 
-      <div className="content-pad" style={{padding:"16px 24px",minHeight:"calc(100vh - 106px)",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      <div className="content-pad" style={{padding:"20px 28px",minHeight:"calc(100vh - 106px)",display:"flex",flexDirection:"column",overflowY:"auto",WebkitOverflowScrolling:"touch",background:theme==="dark"?`radial-gradient(ellipse 80% 60% at 50% -10%, ${C.green}06, transparent)`:"none"}}>
         {/* FILTER BAR - hidden on News tab */}
         {tab!=="news" && (()=>{
           const advActive = advFilters.dateFrom||advFilters.dateTo||advFilters.strategyFollowed!=="All"||advFilters.hasPartial1||advFilters.hasPartial2||advFilters.onlyWins||advFilters.onlyLosses||advFilters.gammaLevels.length>0||advFilters.direction!=="All"||advFilters.strategies.length>0||advFilters.minRating>0;
@@ -3066,26 +3130,49 @@ function App(){
         {/* DASHBOARD */}
         {tab==="dashboard" && (
           <div className="fade-in" style={{flex:1,display:"flex",flexDirection:"column",gap:12}}>
-            <div className="metric-grid" style={{display:"grid",gap:10}}>
+            <div className="metric-grid" style={{display:"grid",gap:12}}>
               {[
-                {label:T.totalPnl,value:fmt(metrics.totalPnl),color:pnlColor(metrics.totalPnl),sub:`${metrics.totalTrades} trades`},
-                {label:T.winRate,value:metrics.winRate.toFixed(1)+"%",color:metrics.winRate>=50?C.green:C.red,sub:`${filtered.filter(t=>t.actualPnl>0).length}W / ${filtered.filter(t=>t.actualPnl<0).length}L`},
-                {label:T.profitFactor,value:metrics.profitFactor.toFixed(2)+"x",color:metrics.profitFactor>=1.5?C.green:metrics.profitFactor>=1?C.amber:C.red,sub:T.grossProfit},
-                {label:T.maxDrawdown,value:"−$"+metrics.maxDrawdown.toFixed(0),color:C.red,sub:T.peakTrough},
-                {label:T.avgWin,value:fmt(metrics.avgWin),color:C.green,sub:T.perWin},
-                {label:T.avgLoss,value:"−$"+metrics.avgLoss.toFixed(0),color:C.red,sub:T.perLoss},
-                {label:T.avgRating||"Avaliação Média",value:metrics.avgRating>0?("★".repeat(Math.round(metrics.avgRating))+"☆".repeat(5-Math.round(metrics.avgRating))):"—",color:C.amber,sub:metrics.avgRating>0?`${metrics.avgRating.toFixed(1)}/5.0`:(T.noData||"Sem dados"),starDisplay:true},
-                {label:T.bestStrategy,value:metrics.bestStrategy||"—",color:C.accent,sub:T.byTotalPnl,small:true},
-              ].map(m=>(
-                <div key={m.label} className="metric-card" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"24px 26px",flex:1}}>
-                  <div style={{fontSize:16,color:C.muted,fontWeight:600,marginBottom:10}}>{m.label}</div>
-                  {m.starDisplay
-                    ?<div style={{fontSize:28,lineHeight:1,marginBottom:6,letterSpacing:2,color:m.color}}>{m.value}</div>
-                    :<div style={{fontSize:m.small?26:42,fontWeight:800,color:m.color,lineHeight:1,marginBottom:6,fontFamily:"'Barlow Condensed', sans-serif",letterSpacing:"-0.01em"}}>{m.value}</div>
-                  }
-                  <div style={{fontSize:15,color:C.muted}}>{m.sub}</div>
-                </div>
-              ))}
+                {label:T.totalPnl,value:fmt(metrics.totalPnl),color:pnlColor(metrics.totalPnl),sub:`${metrics.totalTrades} trades`,icon:"◈"},
+                {label:T.winRate,value:metrics.winRate.toFixed(1)+"%",color:metrics.winRate>=50?C.green:C.red,sub:`${filtered.filter(t=>t.actualPnl>0).length}W / ${filtered.filter(t=>t.actualPnl<0).length}L`,icon:"◎"},
+                {label:T.profitFactor,value:metrics.profitFactor.toFixed(2)+"x",color:metrics.profitFactor>=1.5?C.green:metrics.profitFactor>=1?C.amber:C.red,sub:T.grossProfit,icon:"⬡"},
+                {label:T.maxDrawdown,value:"−$"+metrics.maxDrawdown.toFixed(0),color:C.red,sub:T.peakTrough,icon:"▽"},
+                {label:T.avgWin,value:fmt(metrics.avgWin),color:C.green,sub:T.perWin,icon:"△"},
+                {label:T.avgLoss,value:"−$"+metrics.avgLoss.toFixed(0),color:C.red,sub:T.perLoss,icon:"▽"},
+                {label:T.avgRating||"Avg Rating",value:metrics.avgRating>0?("★".repeat(Math.round(metrics.avgRating))+"☆".repeat(5-Math.round(metrics.avgRating))):"—",color:C.amber,sub:metrics.avgRating>0?`${metrics.avgRating.toFixed(1)}/5.0`:(T.noData||"—"),starDisplay:true,icon:"★"},
+                {label:T.bestStrategy,value:metrics.bestStrategy||"—",color:C.accent,sub:T.byTotalPnl,small:true,icon:"◆"},
+              ].map((m,idx)=>{
+                const accentColor = m.color;
+                return (
+                  <div key={m.label} className="metric-card"
+                    style={{
+                      background:theme==="dark"
+                        ?`linear-gradient(135deg, ${C.card} 0%, ${C.panel} 100%)`
+                        :`linear-gradient(135deg, ${C.card} 0%, ${C.panel} 100%)`,
+                      border:`1px solid ${C.border}`,
+                      borderTop:`1px solid ${accentColor}40`,
+                      borderRadius:16,
+                      padding:"20px 22px",
+                      flex:1,
+                      "--card-glow":`${accentColor}08`,
+                      animationDelay:`${idx*0.05}s`,
+                    }}>
+                    {/* Top row */}
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{m.label}</div>
+                      <div style={{width:28,height:28,borderRadius:8,background:`${accentColor}15`,border:`1px solid ${accentColor}25`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,color:accentColor}}>{m.icon}</div>
+                    </div>
+                    {/* Value */}
+                    {m.starDisplay
+                      ? <div style={{fontSize:22,lineHeight:1,marginBottom:8,letterSpacing:3,color:m.color}}>{m.value}</div>
+                      : <div className="metric-value" style={{fontSize:m.small?24:38,fontWeight:900,color:accentColor,lineHeight:1,marginBottom:8,fontFamily:"'Montserrat',sans-serif",letterSpacing:"-0.02em",textShadow:theme==="dark"?`0 0 20px ${accentColor}40`:"none"}}>{m.value}</div>
+                    }
+                    {/* Sub */}
+                    <div style={{fontSize:11,color:C.muted,fontFamily:"'Montserrat',sans-serif",fontWeight:500}}>{m.sub}</div>
+                    {/* Bottom accent line */}
+                    <div style={{position:"absolute",bottom:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${accentColor}60,transparent)`,borderRadius:"0 0 16px 16px"}}/>
+                  </div>
+                );
+              })}
             </div>
 
             {/* DISCIPLINE SCORE WIDGET */}
@@ -3103,26 +3190,30 @@ function App(){
                 {label:T.discRating||"Avaliação",pct:ratingPct,color:ratingPct!=null?(ratingPct>=70?C.green:ratingPct>=50?C.amber:C.red):C.muted,noData:ratingPct==null},
               ];
               return (
-                <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:"22px 26px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`linear-gradient(135deg,${C.card},${C.panel})`,border:`1px solid ${dsColor}30`,borderRadius:16,padding:"22px 26px",position:"relative",overflow:"hidden"}}>
+                  {/* Background glow */}
+                  {theme==="dark"&&<div style={{position:"absolute",top:-40,right:-40,width:160,height:160,borderRadius:"50%",background:`${dsColor}08`,filter:"blur(40px)",pointerEvents:"none"}}/>}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20,position:"relative"}}>
                     <div>
-                      <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:4}}>{T.disciplineScore||"Score de Disciplina"}</div>
-                      <div style={{fontSize:13,color:C.muted}}>{T.discPlan||"Plano"} · {T.discStop||"Stop"} · {T.discRating||"Avaliação"}</div>
+                      <div style={{fontSize:11,color:C.muted,fontWeight:700,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif",marginBottom:6}}>⬡ {T.disciplineScore||"Discipline Score"}</div>
+                      <div style={{fontSize:13,color:C.muted,fontFamily:"'Montserrat',sans-serif"}}>{T.discPlan||"Plan"} · {T.discStop||"Stop"} · {T.discRating||"Rating"}</div>
                     </div>
                     <div style={{textAlign:"right"}}>
-                      <div style={{fontSize:52,fontWeight:900,color:dsColor,fontFamily:"'Barlow Condensed',sans-serif",lineHeight:1}}>{ds}<span style={{fontSize:24,opacity:0.6}}>/100</span></div>
-                      <div style={{fontSize:13,fontWeight:700,color:dsColor,marginTop:2}}>{ds>=80?"🏆 Excelente":ds>=60?"👍 Bom":"⚠️ Melhorar"}</div>
+                      <div style={{fontSize:56,fontWeight:900,color:dsColor,fontFamily:"'Montserrat',sans-serif",lineHeight:1,textShadow:theme==="dark"?`0 0 30px ${dsColor}50`:"none"}}>
+                        {ds}<span style={{fontSize:20,opacity:0.5,fontWeight:600}}>/100</span>
+                      </div>
+                      <div style={{fontSize:11,fontWeight:700,color:dsColor,marginTop:4,letterSpacing:"0.06em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{ds>=80?"🏆 Excellent":ds>=60?"👍 Good":"⚠️ Improve"}</div>
                     </div>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:16,position:"relative"}}>
                     {pillars.map(p=>(
                       <div key={p.label}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                          <span style={{fontSize:13,color:C.muted,fontWeight:600}}>{p.label}</span>
-                          <span style={{fontSize:13,fontWeight:800,color:p.noData?C.muted:p.color}}>{p.noData?"—":p.pct.toFixed(0)+"%"}</span>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                          <span style={{fontSize:11,color:C.muted,fontWeight:600,fontFamily:"'Montserrat',sans-serif",letterSpacing:"0.04em"}}>{p.label}</span>
+                          <span style={{fontSize:12,fontWeight:800,color:p.noData?C.muted:p.color,fontFamily:"'Montserrat',sans-serif"}}>{p.noData?"—":p.pct.toFixed(0)+"%"}</span>
                         </div>
-                        <div style={{height:8,background:C.border,borderRadius:4,overflow:"hidden"}}>
-                          <div style={{height:"100%",width:(p.noData?0:p.pct)+"%",background:p.noData?C.border:p.color,borderRadius:4,transition:"width 0.6s ease"}}/>
+                        <div style={{height:6,background:C.border,borderRadius:3,overflow:"hidden"}}>
+                          <div className="progress-bar" style={{height:"100%",width:(p.noData?0:p.pct)+"%",background:p.noData?C.border:`linear-gradient(90deg,${p.color},${p.color}aa)`,borderRadius:3,boxShadow:p.noData?"none":`0 0 8px ${p.color}60`}}/>
                         </div>
                       </div>
                     ))}
@@ -3131,13 +3222,19 @@ function App(){
               );
             })()}
 
-            <div className="dashboard-charts-grid" style={{display:"grid",gap:10,flex:1}}>
-              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22,display:"flex",flexDirection:"column"}}>
-                <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:16}}>{T.equityCurve}</div>
+            <div className="dashboard-charts-grid" style={{display:"grid",gap:12,flex:1}}>
+              <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`${C.card}`,border:`1px solid ${C.border}`,borderTop:`1px solid ${C.cyan}30`,borderRadius:16,padding:"20px 22px",display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                  <div style={{width:3,height:18,background:`linear-gradient(180deg,${C.cyan},${C.green})`,borderRadius:2}}/>
+                  <span style={{fontSize:12,fontWeight:700,color:C.text,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{T.equityCurve}</span>
+                </div>
                 <div style={{flex:1,minHeight:160}}><SimpleLineChart data={equityCurve} height={200} T={T}/></div>
               </div>
-              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:16,padding:22}}>
-                <div style={{fontSize:18,fontWeight:700,color:C.text,marginBottom:16}}>{T.pnlByDay}</div>
+              <div style={{background:theme==="dark"?`linear-gradient(135deg,${C.card},${C.panel})`:`${C.card}`,border:`1px solid ${C.border}`,borderTop:`1px solid ${C.amber}30`,borderRadius:16,padding:"20px 22px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
+                  <div style={{width:3,height:18,background:`linear-gradient(180deg,${C.amber},${C.red})`,borderRadius:2}}/>
+                  <span style={{fontSize:12,fontWeight:700,color:C.text,letterSpacing:"0.08em",textTransform:"uppercase",fontFamily:"'Montserrat',sans-serif"}}>{T.pnlByDay}</span>
+                </div>
                 <SimpleBarChart data={pnlByDay} height={180} T={T}/>
               </div>
             </div>
@@ -3165,7 +3262,7 @@ function App(){
 
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:19,minWidth:1300}}>
               <thead>
-                <tr style={{borderBottom:`1px solid ${C.border}`,background:C.panel}}>
+                <tr style={{borderBottom:`1px solid ${C.border}`,background:theme==="dark"?`rgba(8,14,26,0.9)`:C.panel,position:"sticky",top:0,zIndex:5}}>
                   {/* Select all checkbox */}
                   <th style={{padding:"16px 8px 16px 20px",width:36}}>
                     <div onClick={toggleSelectAll} style={{width:20,height:20,borderRadius:5,border:`2px solid ${selectedTrades.size===filtered.length&&filtered.length>0?C.accent:C.border}`,background:selectedTrades.size===filtered.length&&filtered.length>0?C.accent:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
