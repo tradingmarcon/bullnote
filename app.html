@@ -60,7 +60,7 @@
   window.dispatchEvent(new Event("firebaseReady"));
 </script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Barlow Condensed', sans-serif; }
   input, select, textarea, button { font-family: 'Barlow Condensed', sans-serif; }
   html, body { background: #0f1117; font-family: 'Barlow Condensed', sans-serif; height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; max-width: 100vw; }
@@ -1499,7 +1499,7 @@ function PsychologyAI({trades, C, lang}){
 
 function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, onPhotoChange, userUsername}){
   const labels = {
-    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança",
+    pt:{ title:"Minha Conta", profileTab:"Perfil", securityTab:"Segurança", planTab:"Plano",
       name:"Nome de exibição", email:"Email", newEmail:"Novo email",
       emailInfo:"Um link de confirmação será enviado para o novo email.",
       emailSent:"✅ Link de confirmação enviado! Verifique sua caixa de entrada.",
@@ -1509,7 +1509,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       pwdMismatch:"As senhas não coincidem.", pwdShort:"Mínimo 6 caracteres.",
       photoLabel:"Foto de perfil", changePhoto:"Alterar foto", uploading:"Enviando...",
       close:"Fechar" },
-    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad",
+    es:{ title:"Mi Cuenta", profileTab:"Perfil", securityTab:"Seguridad", planTab:"Plan",
       name:"Nombre visible", email:"Email actual", newEmail:"Nuevo email",
       emailInfo:"Se enviará un enlace de confirmación al nuevo email.",
       emailSent:"✅ ¡Enlace enviado! Revisa tu bandeja de entrada.",
@@ -1519,7 +1519,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
       pwdMismatch:"Las contraseñas no coinciden.", pwdShort:"Mínimo 6 caracteres.",
       photoLabel:"Foto de perfil", changePhoto:"Cambiar foto", uploading:"Subiendo...",
       close:"Cerrar" },
-    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security",
+    en:{ title:"My Account", profileTab:"Profile", securityTab:"Security", planTab:"Plan",
       name:"Display name", email:"Current email", newEmail:"New email",
       emailInfo:"A confirmation link will be sent to the new email.",
       emailSent:"✅ Confirmation link sent! Check your inbox.",
@@ -1545,7 +1545,23 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
   const [showCurr, setShowCurr]   = React.useState(false);
   const [showNew, setShowNew]     = React.useState(false);
   const [localUsername, setLocalUsername] = React.useState(userUsername||"");
+  const [currentPlan, setCurrentPlan] = React.useState("pro"); // "free" | "pro" | "premium"
+  const [planLoading, setPlanLoading] = React.useState(false);
+  const [planMsg, setPlanMsg]     = React.useState(null);
+  const [confirmPlanChange, setConfirmPlanChange] = React.useState(null); // {plan, label}
   const fileRef = React.useRef(null);
+
+  // Load current plan from Firestore
+  React.useEffect(()=>{
+    if(!currentUser) return;
+    async function loadPlan(){
+      try{
+        const snap = await window.fsGetDocs(window.fsCollection(window.db,`users/${currentUser.uid}/settings`));
+        snap.forEach(d=>{ if(d.id==="profile" && d.data().plan) setCurrentPlan(d.data().plan); });
+      }catch(e){}
+    }
+    loadPlan();
+  },[currentUser?.uid]);
 
   // Generate username for pre-existing accounts that don't have one yet
   React.useEffect(()=>{
@@ -1553,33 +1569,25 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     if(!currentUser) return;
     async function ensureUsername(){
       try{
-        // Read directly from user's own profile (always permitted)
         const profileSnap = await window.fsGetDocs(
           window.fsCollection(window.db, `users/${currentUser.uid}/settings`)
         );
         let existingUsername = null;
         profileSnap.forEach(d=>{ if(d.id==="profile" && d.data().username) existingUsername = d.data().username; });
         if(existingUsername){ setLocalUsername(existingUsername); return; }
-
-        // Generate new username — format: firstname_xxxxx (5 random a-z0-9)
         const base = (currentUser.displayName||currentUser.email||"trader")
           .split(/[\s@]/)[0].toLowerCase().replace(/[^a-z0-9]/g,"").slice(0,12)||"trader";
         const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
         let suffix = "";
         for(let j=0;j<5;j++) suffix += chars[Math.floor(Math.random()*chars.length)];
         const username = `${base}_${suffix}`;
-
-        // Save to user's own profile first (always works)
         await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser.uid}/settings`,"profile"),
           {username},{merge:true});
-
-        // Try to save to global usernames collection (may fail if rules not set — that's ok)
         try{
           await window.fsSetDoc(window.fsDoc(window.db,"usernames",username),{
             username, email:currentUser.email, uid:currentUser.uid, createdAt:Date.now()
           });
-        }catch(e){ /* Firestore rules may not allow this yet — username still works for display */ }
-
+        }catch(e){}
         setLocalUsername(username);
       }catch(e){ console.error("Username gen error:",e); }
     }
@@ -1591,6 +1599,20 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     await window.fbReauth(currentUser, cred);
   }
 
+  async function changePlan(newPlan){
+    setPlanLoading(true); setPlanMsg(null);
+    try{
+      await window.fsSetDoc(window.fsDoc(window.db,`users/${currentUser.uid}/settings`,"profile"),
+        {plan: newPlan},{merge:true});
+      setCurrentPlan(newPlan);
+      setPlanMsg({type:"success", text:"Plano atualizado com sucesso!"});
+      setConfirmPlanChange(null);
+    }catch(e){
+      setPlanMsg({type:"error", text:"Erro ao atualizar plano. Tente novamente."});
+    }
+    setPlanLoading(false);
+  }
+
   async function uploadPhoto(file){
     if(!file) return;
     const validTypes = ["image/jpeg","image/png","image/webp","image/gif"];
@@ -1598,7 +1620,6 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     if(file.size > 5*1024*1024){ setMsg({type:"error",text:"Imagem muito grande. Máximo 5MB."}); return; }
     setPhotoUploading(true); setMsg(null);
     try{
-      // Resize + compress via canvas (max 256px, JPEG 80%)
       const dataUrl = await new Promise((res,rej)=>{
         const reader = new FileReader();
         reader.onerror = rej;
@@ -1619,7 +1640,6 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
         };
         reader.readAsDataURL(file);
       });
-      // Save ONLY to Firestore — Firebase Auth photoURL has a size limit so we skip it
       await window.fsSetDoc(
         window.fsDoc(window.db, `users/${currentUser.uid}/settings`, "profile"),
         { photoURL: dataUrl },
@@ -1682,142 +1702,349 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     setLoading(false);
   }
 
-  const iS={width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:12,color:C.text,padding:"14px 18px",fontSize:16,outline:"none",fontFamily:"\'Barlow Condensed\',sans-serif",boxSizing:"border-box"};
-  const labelS={fontSize:12,color:C.muted,fontWeight:700,letterSpacing:"0.06em",textTransform:"uppercase",display:"block",marginBottom:7};
+  const MF = "'Montserrat', 'Barlow Condensed', sans-serif";
+  const iS={width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:10,color:C.text,padding:"13px 16px",fontSize:14,outline:"none",fontFamily:MF,boxSizing:"border-box",transition:"border-color 0.2s"};
+  const labelS={fontSize:11,color:C.muted,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF};
+
+  // Plan definitions — synced with register.html
+  const PLANS = [
+    {
+      id:"free", label:"Free", price:"$0", period:"",
+      color:"#64748b", gradient:"linear-gradient(135deg,#475569,#334155)",
+      features:[
+        "Trade Journal — 15 trades/mês",
+        "Dashboard de Performance",
+        "Score de Disciplina",
+        "Avaliação de Trade (1–5 estrelas)",
+        "✗ Calendário de Trading",
+        "✗ Análise de Estratégia",
+        "✗ Análise de Psicologia com IA",
+      ],
+      locked:[4,5,6],
+      badge:null
+    },
+    {
+      id:"pro", label:"Pro", price:"$16.99", period:"/mês",
+      color:"#22C55E", gradient:"linear-gradient(135deg,#22C55E,#3b82f6)",
+      features:[
+        "Trade Journal — trades ilimitados",
+        "Dashboard de Performance",
+        "Score de Disciplina",
+        "Avaliação de Trade (1–5 estrelas)",
+        "Calendário de Trading",
+        "Análise de Estratégia",
+        "Multi-idioma (EN/PT/ES)",
+      ],
+      locked:[],
+      badge:"POPULAR"
+    },
+    {
+      id:"premium", label:"Premium", price:"$24.99", period:"/mês",
+      color:"#a855f7", gradient:"linear-gradient(135deg,#a855f7,#ec4899)",
+      features:[
+        "Trade Journal — trades ilimitados",
+        "Dashboard de Performance",
+        "Score de Disciplina",
+        "Avaliação de Trade (1–5 estrelas)",
+        "Calendário de Trading",
+        "Análise de Estratégia",
+        "Análise de Psicologia com IA",
+        "Relatório Semanal de Performance",
+        "Suporte Prioritário",
+      ],
+      locked:[],
+      badge:"BEST VALUE"
+    }
+  ];
+
+  const planOrder = ["free","pro","premium"];
+  const currentPlanIdx = planOrder.indexOf(currentPlan);
 
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={onClose}>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,width:"100%",maxWidth:600,maxHeight:"94vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.6)",fontFamily:"inherit"}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20,backdropFilter:"blur(8px)"}} onClick={onClose}>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:24,width:"100%",maxWidth:560,maxHeight:"92vh",overflowY:"auto",boxShadow:"0 32px 80px rgba(0,0,0,0.7)",fontFamily:MF}} onClick={e=>e.stopPropagation()}>
 
         {/* ── HEADER ── */}
-        <div style={{padding:"32px 36px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <div style={{display:"flex",alignItems:"center",gap:16}}>
-            {/* Avatar with upload */}
+        <div style={{padding:"28px 32px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
             <div style={{position:"relative",cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
               {photoURL
-                ? <img src={photoURL} style={{width:68,height:68,borderRadius:"50%",objectFit:"cover",border:"2px solid #22C55E"}}/>
-                : <div style={{width:68,height:68,borderRadius:"50%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,fontWeight:900,color:"#fff",border:"2px solid #22C55E"}}>
+                ? <img src={photoURL} style={{width:62,height:62,borderRadius:"50%",objectFit:"cover",border:"2.5px solid #22C55E",boxShadow:"0 0 0 4px #22C55E18"}}/>
+                : <div style={{width:62,height:62,borderRadius:"50%",background:"linear-gradient(135deg,#22C55E,#3b82f6)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,fontWeight:900,color:"#fff",border:"2.5px solid #22C55E",boxShadow:"0 0 0 4px #22C55E18",fontFamily:MF}}>
                     {currentUser?.displayName?.[0]?.toUpperCase()||currentUser?.email?.[0]?.toUpperCase()||"U"}
                   </div>
               }
-              <div style={{position:"absolute",bottom:0,right:0,width:24,height:24,borderRadius:"50%",background:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,border:`2px solid ${C.card}`}}>
+              <div style={{position:"absolute",bottom:0,right:0,width:22,height:22,borderRadius:"50%",background:"#22C55E",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,border:`2px solid ${C.card}`,boxShadow:"0 2px 6px rgba(34,197,94,0.4)"}}>
                 {photoUploading ? "⟳" : "📷"}
               </div>
             </div>
             <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>uploadPhoto(e.target.files?.[0])}/>
             <div>
-              <div style={{fontSize:26,fontWeight:800,color:C.text}}>{L.title}</div>
-              <div style={{fontSize:15,color:C.muted,marginTop:3}}>{currentUser?.displayName||currentUser?.email}</div>
-              <div style={{fontSize:11,color:"#22C55E",marginTop:2,cursor:"pointer"}} onClick={()=>fileRef.current?.click()}>
-                {photoUploading ? L.uploading : L.changePhoto}
+              <div style={{fontSize:22,fontWeight:800,color:C.text,fontFamily:MF,letterSpacing:"-0.02em"}}>{L.title}</div>
+              <div style={{fontSize:13,color:C.muted,marginTop:2,fontFamily:MF}}>{currentUser?.displayName||currentUser?.email}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginTop:4}}>
+                <span style={{fontSize:10,fontWeight:800,color:PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E",background:(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")+"18",border:`1px solid ${(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")}30`,borderRadius:20,padding:"2px 10px",fontFamily:MF,letterSpacing:"0.08em",textTransform:"uppercase"}}>
+                  {PLANS.find(p=>p.id===currentPlan)?.label||"Pro"}
+                </span>
+                <span style={{fontSize:11,color:"#22C55E",cursor:"pointer",fontFamily:MF,fontWeight:600}} onClick={()=>fileRef.current?.click()}>
+                  {photoUploading ? L.uploading : L.changePhoto}
+                </span>
               </div>
             </div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:22,lineHeight:1,padding:4,alignSelf:"flex-start"}}>✕</button>
+          <button onClick={onClose} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:20,lineHeight:1,padding:6,alignSelf:"flex-start",borderRadius:8,transition:"background 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.background=C.panel}
+            onMouseLeave={e=>e.currentTarget.style.background="none"}
+          >✕</button>
         </div>
 
         {/* ── TABS ── */}
-        <div style={{display:"flex",gap:6,padding:"24px 36px 0"}}>
-          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab]].map(([t,l])=>(
-            <button key={t} onClick={()=>{setTab(t);setMsg(null);setCurrentPwd("");}} style={{padding:"9px 20px",borderRadius:10,border:"none",background:tab===t?"linear-gradient(135deg,#22C55E,#3b82f6)":"transparent",color:tab===t?"#fff":C.muted,fontFamily:"inherit",fontSize:14,fontWeight:700,cursor:"pointer",transition:"all 0.2s"}}>
+        <div style={{display:"flex",gap:4,padding:"20px 32px 0",borderBottom:`1px solid ${C.border}`,paddingBottom:0}}>
+          {[["profile","👤 "+L.profileTab],["security","🔒 "+L.securityTab],["plan","💎 "+L.planTab]].map(([t,l])=>(
+            <button key={t} onClick={()=>{setTab(t);setMsg(null);setPlanMsg(null);setCurrentPwd("");setConfirmPlanChange(null);}}
+              style={{padding:"10px 18px",borderRadius:"10px 10px 0 0",border:"none",borderBottom:tab===t?`2px solid ${t==="plan"?"#a855f7":"#22C55E"}`:"2px solid transparent",
+                background:"none",color:tab===t?(t==="plan"?"#a855f7":"#22C55E"):C.muted,
+                fontFamily:MF,fontSize:13,fontWeight:700,cursor:"pointer",transition:"all 0.2s",letterSpacing:"0.01em"}}>
               {l}
             </button>
           ))}
         </div>
 
-        <div style={{padding:"24px 36px 36px",display:"flex",flexDirection:"column",gap:18}}>
+        <div style={{padding:"24px 32px 32px",display:"flex",flexDirection:"column",gap:16}}>
 
           {msg&&(
-            <div style={{padding:"11px 16px",borderRadius:10,background:msg.type==="success"?"#22c55e15":"#ef444415",border:`1px solid ${msg.type==="success"?"#22c55e40":"#ef444440"}`,color:msg.type==="success"?"#22c55e":"#ef4444",fontSize:14,fontWeight:600,lineHeight:1.5}}>
+            <div style={{padding:"12px 16px",borderRadius:10,background:msg.type==="success"?"#22c55e12":"#ef444412",border:`1px solid ${msg.type==="success"?"#22c55e35":"#ef444435"}`,color:msg.type==="success"?"#22c55e":"#ef4444",fontSize:13,fontWeight:600,lineHeight:1.5,fontFamily:MF}}>
               {msg.text}
             </div>
           )}
 
           {/* ── PROFILE TAB ── */}
           {tab==="profile"&&(<>
-            {localUsername&&(
-              <div style={{background:`${C.panel}`,border:`2px solid #22C55E40`,borderRadius:12,padding:"14px 18px"}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#22C55E",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>👤 Your Username</div>
-                <div style={{fontSize:22,fontWeight:900,color:C.text,fontFamily:"monospace",letterSpacing:"0.05em"}}>{localUsername}</div>
-                <div style={{fontSize:12,color:C.muted,marginTop:4}}>Use this to recover your password if you ever forget it.</div>
-              </div>
-            )}
-            {!localUsername&&(
-              <div style={{background:C.panel,borderRadius:12,padding:"14px 18px",border:`1px solid ${C.border}`,fontSize:13,color:C.muted}}>
-                ⏳ Generating your username...
-              </div>
-            )}
+            {/* Username card */}
+            <div style={{background:C.bg,border:`1px solid #22C55E25`,borderRadius:14,padding:"16px 18px",position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:"linear-gradient(90deg,#22C55E,#3b82f6)"}}/>
+              <div style={{fontSize:10,fontWeight:800,color:"#22C55E",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:8,fontFamily:MF}}>👤 Seu Username</div>
+              {localUsername
+                ? <div style={{fontSize:20,fontWeight:800,color:C.text,fontFamily:"monospace",letterSpacing:"0.04em"}}>{localUsername}</div>
+                : <div style={{fontSize:13,color:C.muted,fontFamily:MF}}>⏳ Gerando seu username...</div>
+              }
+              <div style={{fontSize:11,color:C.muted,marginTop:6,fontFamily:MF,lineHeight:1.5}}>Use este username para recuperar sua senha.</div>
+            </div>
+
+            {/* Display name */}
             <div>
               <label style={labelS}>{L.name}</label>
-              <input value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder={currentUser?.email?.split("@")[0]||"Your name"} style={iS} onKeyDown={e=>e.key==="Enter"&&saveProfile()}/>
+              <input value={displayName} onChange={e=>setDisplayName(e.target.value)}
+                placeholder={currentUser?.email?.split("@")[0]||"Seu nome"} style={iS}
+                onKeyDown={e=>e.key==="Enter"&&saveProfile()}
+                onFocus={e=>e.target.style.borderColor="#22C55E"}
+                onBlur={e=>e.target.style.borderColor=C.border}/>
             </div>
+
+            {/* Email (read-only) */}
             <div>
               <label style={labelS}>{L.email}</label>
-              <input value={currentUser?.email||""} disabled style={{...iS,opacity:0.45,cursor:"not-allowed"}}/>
+              <input value={currentUser?.email||""} disabled style={{...iS,opacity:0.4,cursor:"not-allowed"}}/>
             </div>
-            <button onClick={saveProfile} disabled={loading} style={{background:loading?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:12,padding:"13px",fontFamily:"inherit",fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:16,opacity:loading?0.7:1}}>
-              {loading?"⏳...":L.save}
+
+            <button onClick={saveProfile} disabled={loading}
+              style={{background:loading?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"14px",fontFamily:MF,fontWeight:700,cursor:loading?"not-allowed":"pointer",fontSize:14,letterSpacing:"0.02em",opacity:loading?0.7:1,transition:"opacity 0.2s"}}>
+              {loading?"Salvando...":L.save}
             </button>
           </>)}
 
           {/* ── SECURITY TAB ── */}
           {tab==="security"&&(<>
-            {/* Change email section */}
-            <div style={{background:C.panel,borderRadius:14,padding:"16px 18px",border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:12}}>📧 {L.newEmail}</div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {/* Change email */}
+            <div style={{background:C.bg,borderRadius:14,padding:"18px 20px",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:14,fontFamily:MF,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>📧</span> {L.newEmail}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div>
                   <label style={labelS}>{L.newEmail}</label>
-                  <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="novo@email.com" style={iS}/>
+                  <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} placeholder="novo@email.com" style={iS}
+                    onFocus={e=>e.target.style.borderColor="#3b82f6"} onBlur={e=>e.target.style.borderColor=C.border}/>
                 </div>
                 <div>
                   <label style={labelS}>{L.currentPwd}</label>
                   <div style={{position:"relative"}}>
-                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}/>
-                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showCurr?"🙈":"👁️"}</button>
+                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}
+                      onFocus={e=>e.target.style.borderColor="#3b82f6"} onBlur={e=>e.target.style.borderColor=C.border}/>
+                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:15}}>{showCurr?"🙈":"👁️"}</button>
                   </div>
                 </div>
-                <div style={{fontSize:12,color:C.muted,opacity:0.8}}>ℹ️ {L.emailInfo}</div>
-                <button onClick={saveEmail} disabled={loading||!newEmail||!currentPwd} style={{background:loading||!newEmail||!currentPwd?"#1E293B":"linear-gradient(135deg,#3b82f6,#22C55E)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:loading||!newEmail||!currentPwd?"not-allowed":"pointer",fontSize:15,opacity:loading||!newEmail||!currentPwd?0.5:1}}>
-                  {loading?"⏳...":L.saveEmail}
+                <div style={{fontSize:11,color:C.muted,fontFamily:MF,lineHeight:1.5}}>ℹ️ {L.emailInfo}</div>
+                <button onClick={saveEmail} disabled={loading||!newEmail||!currentPwd}
+                  style={{background:loading||!newEmail||!currentPwd?"#1E293B":"linear-gradient(135deg,#3b82f6,#22C55E)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontFamily:MF,fontWeight:700,cursor:loading||!newEmail||!currentPwd?"not-allowed":"pointer",fontSize:13,opacity:loading||!newEmail||!currentPwd?0.4:1}}>
+                  {loading?"Enviando...":L.saveEmail}
                 </button>
               </div>
             </div>
 
-            {/* Change password section */}
-            <div style={{background:C.panel,borderRadius:14,padding:"16px 18px",border:`1px solid ${C.border}`}}>
-              <div style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:12}}>🔑 {L.changePwd}</div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {/* Change password */}
+            <div style={{background:C.bg,borderRadius:14,padding:"18px 20px",border:`1px solid ${C.border}`}}>
+              <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:14,fontFamily:MF,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:16}}>🔑</span> {L.changePwd}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:12}}>
                 <div>
                   <label style={labelS}>{L.currentPwd}</label>
                   <div style={{position:"relative"}}>
-                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}/>
-                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showCurr?"🙈":"👁️"}</button>
+                    <input type={showCurr?"text":"password"} value={currentPwd} onChange={e=>setCurrentPwd(e.target.value)} style={iS}
+                      onFocus={e=>e.target.style.borderColor="#22C55E"} onBlur={e=>e.target.style.borderColor=C.border}/>
+                    <button onClick={()=>setShowCurr(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:15}}>{showCurr?"🙈":"👁️"}</button>
                   </div>
                 </div>
                 <div>
                   <label style={labelS}>{L.newPwd}</label>
                   <div style={{position:"relative"}}>
-                    <input type={showNew?"text":"password"} value={newPwd} onChange={e=>setNewPwd(e.target.value)} style={iS}/>
-                    <button onClick={()=>setShowNew(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>{showNew?"🙈":"👁️"}</button>
+                    <input type={showNew?"text":"password"} value={newPwd} onChange={e=>setNewPwd(e.target.value)} style={iS}
+                      onFocus={e=>e.target.style.borderColor="#22C55E"} onBlur={e=>e.target.style.borderColor=C.border}/>
+                    <button onClick={()=>setShowNew(s=>!s)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:15}}>{showNew?"🙈":"👁️"}</button>
                   </div>
                 </div>
                 <div>
                   <label style={labelS}>{L.confirmPwd}</label>
-                  <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)} style={{...iS,borderColor:confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border}}/>
+                  <input type="password" value={confirmPwd} onChange={e=>setConfirmPwd(e.target.value)}
+                    style={{...iS,borderColor:confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border}}
+                    onFocus={e=>{ if(!confirmPwd||confirmPwd===newPwd) e.target.style.borderColor="#22C55E"; }}
+                    onBlur={e=>{ e.target.style.borderColor=confirmPwd&&confirmPwd!==newPwd?"#ef4444":C.border; }}/>
+                  {confirmPwd&&confirmPwd!==newPwd&&<div style={{fontSize:11,color:"#ef4444",marginTop:5,fontFamily:MF,fontWeight:600}}>⚠ {L.pwdMismatch}</div>}
                 </div>
-                <button onClick={savePassword} disabled={loading||!currentPwd||!newPwd||!confirmPwd} style={{background:loading||!currentPwd||!newPwd||!confirmPwd?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"11px",fontFamily:"inherit",fontWeight:700,cursor:loading||!currentPwd||!newPwd||!confirmPwd?"not-allowed":"pointer",fontSize:15,opacity:loading||!currentPwd||!newPwd||!confirmPwd?0.5:1}}>
-                  {loading?"⏳...":L.save}
+                <button onClick={savePassword} disabled={loading||!currentPwd||!newPwd||!confirmPwd}
+                  style={{background:loading||!currentPwd||!newPwd||!confirmPwd?"#1E293B":"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontFamily:MF,fontWeight:700,cursor:loading||!currentPwd||!newPwd||!confirmPwd?"not-allowed":"pointer",fontSize:13,opacity:loading||!currentPwd||!newPwd||!confirmPwd?0.4:1}}>
+                  {loading?"Salvando...":L.save}
                 </button>
               </div>
             </div>
           </>)}
 
+          {/* ── PLAN TAB ── */}
+          {tab==="plan"&&(<>
+            {/* Current plan banner */}
+            <div style={{background:C.bg,borderRadius:14,padding:"16px 18px",border:`1px solid ${(PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E")}30`,position:"relative",overflow:"hidden"}}>
+              <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:PLANS.find(p=>p.id===currentPlan)?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)"}}/>
+              <div style={{fontSize:10,fontWeight:800,color:C.muted,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:MF,marginBottom:6}}>Plano atual</div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{fontSize:22,fontWeight:900,color:PLANS.find(p=>p.id===currentPlan)?.color||"#22C55E",fontFamily:MF}}>
+                  {PLANS.find(p=>p.id===currentPlan)?.label}
+                </div>
+                <div style={{fontSize:22,fontWeight:900,color:C.text,fontFamily:MF}}>
+                  {PLANS.find(p=>p.id===currentPlan)?.price}<span style={{fontSize:12,color:C.muted,fontWeight:500}}>{PLANS.find(p=>p.id===currentPlan)?.period}</span>
+                </div>
+              </div>
+            </div>
+
+            {planMsg&&(
+              <div style={{padding:"11px 16px",borderRadius:10,background:planMsg.type==="success"?"#22c55e12":"#ef444412",border:`1px solid ${planMsg.type==="success"?"#22c55e35":"#ef444435"}`,color:planMsg.type==="success"?"#22c55e":"#ef4444",fontSize:13,fontWeight:600,fontFamily:MF}}>
+                {planMsg.text}
+              </div>
+            )}
+
+            {/* Plan cards */}
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              {PLANS.map((plan,idx)=>{
+                const isActive = currentPlan===plan.id;
+                const isUpgrade = idx > currentPlanIdx;
+                const isDowngrade = idx < currentPlanIdx;
+                return (
+                  <div key={plan.id} style={{
+                    background:isActive?`${plan.color}08`:C.bg,
+                    border:`1.5px solid ${isActive?plan.color:C.border}`,
+                    borderRadius:14,padding:"16px 18px",position:"relative",
+                    transition:"all 0.2s",cursor:isActive?"default":"pointer",
+                    opacity:planLoading?0.6:1
+                  }}
+                    onMouseEnter={e=>{ if(!isActive) e.currentTarget.style.borderColor=plan.color; }}
+                    onMouseLeave={e=>{ if(!isActive) e.currentTarget.style.borderColor=C.border; }}
+                    onClick={()=>{ if(!isActive&&!planLoading) setConfirmPlanChange({plan:plan.id,label:plan.label}); }}
+                  >
+                    {/* Badge */}
+                    {plan.badge&&(
+                      <div style={{position:"absolute",top:12,right:14,fontSize:9,fontWeight:800,color:"#fff",background:plan.gradient,borderRadius:20,padding:"3px 10px",fontFamily:MF,letterSpacing:"0.08em"}}>
+                        {plan.badge}
+                      </div>
+                    )}
+                    {isActive&&(
+                      <div style={{position:"absolute",top:12,right:14,fontSize:9,fontWeight:800,color:plan.color,background:`${plan.color}18`,border:`1px solid ${plan.color}40`,borderRadius:20,padding:"3px 10px",fontFamily:MF,letterSpacing:"0.08em"}}>
+                        ✓ ATIVO
+                      </div>
+                    )}
+
+                    <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                      {/* Color dot */}
+                      <div style={{width:10,height:10,borderRadius:"50%",background:plan.gradient,marginTop:5,flexShrink:0}}/>
+                      <div style={{flex:1}}>
+                        <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:8}}>
+                          <span style={{fontSize:16,fontWeight:800,color:isActive?plan.color:C.text,fontFamily:MF}}>{plan.label}</span>
+                          <span style={{fontSize:20,fontWeight:900,color:C.text,fontFamily:MF}}>{plan.price}</span>
+                          <span style={{fontSize:11,color:C.muted,fontFamily:MF}}>{plan.period}</span>
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:"4px 14px"}}>
+                          {plan.features.map((f,fi)=>{
+                            const isLocked = plan.locked && plan.locked.includes(fi);
+                            return (
+                              <div key={f} style={{display:"flex",alignItems:"center",gap:5}}>
+                                <span style={{fontSize:9,color:isLocked?"#ef4444":plan.color}}>{isLocked?"✗":"✓"}</span>
+                                <span style={{fontSize:11,color:isLocked?C.muted+"80":C.muted,fontFamily:MF,textDecoration:isLocked?"line-through":"none",opacity:isLocked?0.5:1}}>{f.replace(/^[✗] /,"")}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {!isActive&&(
+                          <div style={{marginTop:12}}>
+                            <span style={{
+                              display:"inline-block",fontSize:11,fontWeight:700,fontFamily:MF,
+                              color:isUpgrade?"#fff":C.muted,
+                              background:isUpgrade?plan.gradient:"none",
+                              border:isUpgrade?"none":`1px solid ${C.border}`,
+                              borderRadius:8,padding:"6px 16px",letterSpacing:"0.03em"
+                            }}>
+                              {isUpgrade?"⬆ Fazer Upgrade":"⬇ Fazer Downgrade"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{fontSize:11,color:C.muted,fontFamily:MF,lineHeight:1.6,textAlign:"center",padding:"0 8px"}}>
+              Mudanças de plano são aplicadas imediatamente. Integração com pagamentos em breve via Stripe.
+            </div>
+
+            {/* Confirm plan change dialog */}
+            {confirmPlanChange&&(
+              <div style={{background:C.bg,border:`1px solid ${(PLANS.find(p=>p.id===confirmPlanChange.plan)?.color||"#22C55E")}40`,borderRadius:14,padding:"18px 20px"}}>
+                <div style={{fontSize:14,fontWeight:700,color:C.text,fontFamily:MF,marginBottom:6}}>
+                  Confirmar mudança de plano?
+                </div>
+                <div style={{fontSize:12,color:C.muted,fontFamily:MF,marginBottom:14,lineHeight:1.5}}>
+                  Você vai mudar do plano <strong style={{color:C.text}}>{PLANS.find(p=>p.id===currentPlan)?.label}</strong> para o plano <strong style={{color:PLANS.find(p=>p.id===confirmPlanChange.plan)?.color}}>{confirmPlanChange.label}</strong>.
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>changePlan(confirmPlanChange.plan)} disabled={planLoading}
+                    style={{flex:1,background:PLANS.find(p=>p.id===confirmPlanChange.plan)?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"11px",fontFamily:MF,fontWeight:700,cursor:planLoading?"not-allowed":"pointer",fontSize:13}}>
+                    {planLoading?"Atualizando...":"Confirmar"}
+                  </button>
+                  <button onClick={()=>setConfirmPlanChange(null)}
+                    style={{flex:1,background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"11px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </>)}
+
           {/* Sign out */}
-          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
-            <button onClick={onLogout} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:12,padding:"12px",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:15,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"border-color 0.2s"}}
-              onMouseEnter={e=>e.currentTarget.style.borderColor="#ef4444"}
-              onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}
+          <div style={{borderTop:`1px solid ${C.border}`,paddingTop:14,marginTop:4}}>
+            <button onClick={onLogout}
+              style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:10,padding:"12px",fontFamily:MF,fontWeight:700,cursor:"pointer",fontSize:13,color:C.muted,display:"flex",alignItems:"center",justifyContent:"center",gap:8,transition:"all 0.2s",letterSpacing:"0.02em"}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor="#ef4444";e.currentTarget.style.color="#ef4444";}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.color=C.muted;}}
             >
               ⏻ {L.logout}
             </button>
