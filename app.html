@@ -1595,25 +1595,46 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
   // Mount Stripe Card Element into #stripe-card-mount
   async function mountCard(isDark){
+    // Unmount previous instance if any
+    if(cardRef.current){ try{ cardRef.current.unmount(); }catch(e){} cardRef.current=null; }
+
     const stripe = await loadStripe();
     stripeRef.current = stripe;
     const elements = stripe.elements();
     elementsRef.current = elements;
+
+    const textColor   = isDark ? "#f1f5f9" : "#0f172a";
+    const placeholderColor = isDark ? "#64748b" : "#94a3b8";
+
     const card = elements.create("card",{
       style:{
         base:{
-          fontFamily:"'Montserrat',sans-serif", fontSize:"15px",
-          color: isDark ? "#f1f5f9" : "#0f172a",
-          "::placeholder":{ color: isDark ? "#475569" : "#94a3b8" },
+          fontFamily:"'Montserrat', sans-serif",
+          fontSize:"16px",
+          fontWeight:"500",
+          color: textColor,
+          letterSpacing:"0.02em",
+          "::placeholder":{ color: placeholderColor },
           iconColor: "#22C55E",
         },
-        invalid:{ color:"#ef4444" }
+        invalid:{
+          color:"#ef4444",
+          iconColor:"#ef4444",
+        },
+        complete:{
+          color:"#22C55E",
+          iconColor:"#22C55E",
+        }
       },
       hidePostalCode: true,
     });
     cardRef.current = card;
     card.mount("#stripe-card-mount");
-    card.on("change", e=>{ setCardComplete(e.complete); if(e.error) setPlanMsg({type:"error",text:e.error.message}); else setPlanMsg(null); });
+    card.on("change", e=>{
+      setCardComplete(e.complete);
+      if(e.error) setPlanMsg({type:"error",text:e.error.message});
+      else setPlanMsg(null);
+    });
   }
 
   async function handlePayment(){
@@ -1696,7 +1717,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
     setPlanMsg(null);
     setCardComplete(false);
     // Mount card after render
-    setTimeout(()=> mountCard(true), 100);
+    setTimeout(()=> mountCard(C.bg==="#0f1117"||C.bg==="#111827"||C.bg<"#888"), 150);
   }
 
   function openDowngradeFlow(plan){
@@ -2169,7 +2190,7 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
                       {/* Stripe Card Element mount point */}
                       <div style={{marginBottom:14}}>
                         <label style={{fontSize:11,fontWeight:700,color:C.muted,letterSpacing:"0.07em",textTransform:"uppercase",display:"block",marginBottom:6,fontFamily:MF}}>Dados do Cartão</label>
-                        <div id="stripe-card-mount" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"14px 16px",transition:"border-color 0.2s"}}/>
+                        <div id="stripe-card-mount" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"16px 18px",transition:"border-color 0.2s",minHeight:52,lineHeight:"normal"}}/>
                       </div>
 
                       {planMsg&&(
@@ -2213,37 +2234,41 @@ function AccountModal({C, currentUser, onClose, onLogout, lang, userPhotoURL, on
 
                       {/* Show discounted price when coupon applied */}
                       {(()=>{
-                        let displayPrice = targetPlan?.price || "";
+                        const tp = PLANS.find(p=>p.id===confirmPlanChange?.plan);
+                        const basePrice = parseFloat((tp?.price||"0").replace("$",""));
+                        let displayPrice = tp?.price || "";
                         let originalPrice = null;
+                        let discountedVal = null;
+
                         if(couponStatus?.valid && couponStatus?.discount){
-                          const base = parseFloat((targetPlan?.price||"0").replace("$",""));
                           const discountStr = couponStatus.discount;
                           if(discountStr.includes("%")){
                             const pct = parseFloat(discountStr);
-                            const discounted = base * (1 - pct/100);
-                            originalPrice = `$${base.toFixed(2)}`;
-                            displayPrice = `$${discounted.toFixed(2)}`;
+                            discountedVal = basePrice * (1 - pct/100);
                           } else if(discountStr.includes("$")){
-                            const amt = parseFloat(discountStr.replace("$","").replace(" off",""));
-                            const discounted = Math.max(0, base - amt);
-                            originalPrice = `$${base.toFixed(2)}`;
-                            displayPrice = `$${discounted.toFixed(2)}`;
+                            const amt = parseFloat(discountStr.replace(/[^0-9.]/g,""));
+                            discountedVal = Math.max(0, basePrice - amt);
+                          }
+                          if(discountedVal !== null){
+                            originalPrice = `$${basePrice.toFixed(2)}`;
+                            displayPrice = `$${discountedVal.toFixed(2)}`;
                           }
                         }
+
                         return (<>
                           {originalPrice&&(
-                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,padding:"8px 12px",background:"#22C55E10",border:"1px solid #22C55E30",borderRadius:8}}>
-                              <span style={{fontSize:12,color:C.muted,fontFamily:MF,textDecoration:"line-through"}}>{originalPrice}{targetPlan?.period}</span>
-                              <span style={{fontSize:16,fontWeight:900,color:"#22C55E",fontFamily:MF}}>{displayPrice}{targetPlan?.period}</span>
-                              <span style={{fontSize:11,color:"#22C55E",fontFamily:MF,fontWeight:600}}>({couponStatus.discount} aplicado!)</span>
+                            <div style={{display:"flex",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:12,padding:"10px 14px",background:"#22C55E10",border:"1px solid #22C55E35",borderRadius:10}}>
+                              <span style={{fontSize:13,color:C.muted,fontFamily:MF,textDecoration:"line-through",fontWeight:500}}>{originalPrice}{tp?.period}</span>
+                              <span style={{fontSize:20,fontWeight:900,color:"#22C55E",fontFamily:MF,letterSpacing:"-0.02em"}}>{displayPrice}<span style={{fontSize:12,fontWeight:500,color:C.muted}}>{tp?.period}</span></span>
+                              <span style={{fontSize:11,color:"#22C55E",fontFamily:MF,fontWeight:700,background:"#22C55E18",borderRadius:20,padding:"2px 10px"}}>🎉 {couponStatus.discount} aplicado</span>
                             </div>
                           )}
                           <div style={{display:"flex",gap:8}}>
                             <button onClick={handlePayment} disabled={!cardComplete||payLoading}
-                              style={{flex:1,background:!cardComplete||payLoading?"#1E293B":targetPlan?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"13px",fontFamily:MF,fontWeight:700,cursor:!cardComplete||payLoading?"not-allowed":"pointer",fontSize:13,opacity:!cardComplete||payLoading?0.5:1,transition:"all 0.2s"}}>
-                              {payLoading ? "⏳ Processando..." : `💳 Pagar ${displayPrice}${targetPlan?.period}`}
+                              style={{flex:1,background:!cardComplete||payLoading?"#1E293B":tp?.gradient||"linear-gradient(135deg,#22C55E,#3b82f6)",color:"#fff",border:"none",borderRadius:8,padding:"13px",fontFamily:MF,fontWeight:700,cursor:!cardComplete||payLoading?"not-allowed":"pointer",fontSize:13,opacity:!cardComplete||payLoading?0.5:1,transition:"all 0.2s"}}>
+                              {payLoading ? "⏳ Processando..." : `💳 Pagar ${displayPrice}${tp?.period}`}
                             </button>
-                        <button onClick={()=>{setConfirmPlanChange(null);setCheckoutStep(null);setPlanMsg(null);setCouponCode('');setCouponStatus(null);}}
+                            <button onClick={()=>{setConfirmPlanChange(null);setCheckoutStep(null);setPlanMsg(null);setCouponCode('');setCouponStatus(null);}}
                               style={{background:"none",color:C.muted,border:`1px solid ${C.border}`,borderRadius:8,padding:"12px 18px",fontFamily:MF,cursor:"pointer",fontSize:13}}>
                               Cancelar
                             </button>
